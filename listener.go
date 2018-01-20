@@ -101,12 +101,7 @@ func (l *listener) handleIncoming() {
 				return
 			}
 
-			log.Debugf("listener %s accepted connection: %s (%s) <---> %s (%s)",
-				l,
-				conn.LocalMultiaddr(),
-				conn.LocalPeer(),
-				conn.RemoteMultiaddr(),
-				conn.RemotePeer())
+			log.Debugf("listener %s accepted connection: %s", l, conn)
 
 			select {
 			case l.incoming <- conn:
@@ -137,6 +132,13 @@ func (l *listener) Accept() (transport.Conn, error) {
 			return c, nil
 		}
 	}
+}
+
+func (l *listener) String() string {
+	if s, ok := l.transport.(fmt.Stringer); ok {
+		return fmt.Sprintf("<stream.Listener[%s] %s>", s, l.Multiaddr())
+	}
+	return fmt.Sprintf("<stream.Listener %s>", l.Multiaddr())
 }
 
 var _ transport.Listener = (*listener)(nil)

@@ -96,8 +96,8 @@ func (l *listener) handleIncoming() {
 				// to completely negotiate the connection.
 				log.Debugf("accept upgrade error: %s (%s <--> %s)",
 					err,
-					conn.LocalMultiaddr(),
-					conn.RemoteMultiaddr())
+					maconn.LocalMultiaddr(),
+					maconn.RemoteMultiaddr())
 				return
 			}
 

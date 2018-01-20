@@ -103,17 +103,17 @@ func (l *listener) handleIncoming() {
 
 			log.Debugf("listener %s accepted connection: %s", l, conn)
 
+			// Wait on the context with a timeout. This way,
+			// if we stop accepting connections for some reason,
+			// we'll eventually close all the open ones
+			// instead of hanging onto them.
 			select {
 			case l.incoming <- conn:
 			case <-ctx.Done():
-				if l.ctx.Err() == nil {
+				if l.ctx.Err() == context.DeadlineExceeded {
 					// Listener *not* closed but the accept timeout expired.
 					log.Warningf("listener dropped connection due to slow accept")
 				}
-				// Wait on the context with a timeout. This way,
-				// if we stop accepting connections for some reason,
-				// we'll eventually close all the open ones
-				// instead of hanging onto them.
 				conn.Close()
 			}
 		}()

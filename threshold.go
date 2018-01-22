@@ -20,12 +20,6 @@ type threshold struct {
 	threshold int
 }
 
-func (t *threshold) Count() int {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return t.count
-}
-
 // Acquire increments the counter. It will not block.
 func (t *threshold) Acquire() {
 	t.mu.Lock()

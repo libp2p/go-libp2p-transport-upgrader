@@ -19,6 +19,9 @@ import (
 // without specifying a peer ID.
 var ErrNilPeer = errors.New("nil peer")
 
+// AcceptQueueLength is the number of connections to fully setup before not accepting any new connections
+var AcceptQueueLength = 16
+
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
@@ -35,7 +38,7 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 		Listener:  list,
 		upgrader:  u,
 		transport: t,
-		ticket:    make(chan struct{}),
+		threshold: newThreshold(AcceptQueueLength),
 		incoming:  make(chan transport.Conn),
 		cancel:    cancel,
 		ctx:       ctx,

@@ -27,8 +27,11 @@ type listener struct {
 	incoming chan transport.Conn
 	err      error
 
-	ticket chan struct{}
+	// Used for backpressure
+	threshold *threshold
 
+	// Canceling this context isn't sufficient to tear down the listener.
+	// Call close.
 	ctx    context.Context
 	cancel func()
 }
@@ -61,12 +64,10 @@ func (l *listener) handleIncoming() {
 
 	var catcher tec.TempErrCatcher
 	for {
-
-		select {
-		case <-l.ticket:
-		case <-l.ctx.Done():
-			return
-		}
+		// no need to wait on the context.
+		// Close will drain the incoming channel which will cause the
+		// threshold to drop.
+		l.threshold.Wait()
 
 		maconn, err := l.Listener.Accept()
 		if err != nil {
@@ -103,6 +104,9 @@ func (l *listener) handleIncoming() {
 
 			log.Debugf("listener %s accepted connection: %s", l, conn)
 
+			l.threshold.Acquire()
+			defer l.threshold.Release()
+
 			select {
 			case l.incoming <- conn:
 			case <-ctx.Done():
@@ -122,16 +126,10 @@ func (l *listener) handleIncoming() {
 
 // Accept accepts a connection.
 func (l *listener) Accept() (transport.Conn, error) {
-	for {
-		select {
-		case l.ticket <- struct{}{}:
-		case c, ok := <-l.incoming:
-			if !ok {
-				return nil, l.err
-			}
-			return c, nil
-		}
+	if c, ok := <-l.incoming; ok {
+		return c, nil
 	}
+	return nil, l.err
 }
 
 func (l *listener) String() string {

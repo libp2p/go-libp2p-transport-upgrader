@@ -63,12 +63,7 @@ func (l *listener) handleIncoming() {
 	}()
 
 	var catcher tec.TempErrCatcher
-	for {
-		// no need to wait on the context.
-		// Close will drain the incoming channel which will cause the
-		// threshold to drop.
-		l.threshold.Wait()
-
+	for l.ctx.Err() == nil {
 		maconn, err := l.Listener.Accept()
 		if err != nil {
 			if catcher.IsTemporary(err) {
@@ -121,6 +116,10 @@ func (l *listener) handleIncoming() {
 				conn.Close()
 			}
 		}()
+
+		// The go routine above calls Release when the context is
+		// canceled so there's no need to wait on it here.
+		l.threshold.Wait()
 	}
 }
 

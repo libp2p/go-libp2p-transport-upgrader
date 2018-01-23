@@ -64,6 +64,10 @@ func (l *listener) handleIncoming() {
 
 	var catcher tec.TempErrCatcher
 	for l.ctx.Err() == nil {
+		// The go routine above calls Release when the context is
+		// canceled so there's no need to wait on it here.
+		l.threshold.Wait()
+
 		maconn, err := l.Listener.Accept()
 		if err != nil {
 			if catcher.IsTemporary(err) {
@@ -80,8 +84,11 @@ func (l *listener) handleIncoming() {
 			maconn.RemoteMultiaddr())
 
 		wg.Add(1)
+		l.threshold.Acquire()
+
 		go func() {
 			defer wg.Done()
+			defer l.threshold.Release()
 
 			ctx, cancel := context.WithTimeout(l.ctx, transport.AcceptTimeout)
 			defer cancel()
@@ -99,9 +106,6 @@ func (l *listener) handleIncoming() {
 
 			log.Debugf("listener %s accepted connection: %s", l, conn)
 
-			l.threshold.Acquire()
-			defer l.threshold.Release()
-
 			select {
 			case l.incoming <- conn:
 			case <-ctx.Done():
@@ -116,10 +120,6 @@ func (l *listener) handleIncoming() {
 				conn.Close()
 			}
 		}()
-
-		// The go routine above calls Release when the context is
-		// canceled so there's no need to wait on it here.
-		l.threshold.Wait()
 	}
 }
 

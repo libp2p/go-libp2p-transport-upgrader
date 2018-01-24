@@ -74,6 +74,10 @@ func (l *listener) handleIncoming() {
 			return
 		}
 
+		// The go routine above calls Release when the context is
+		// canceled so there's no need to wait on it here.
+		l.threshold.Wait()
+
 		log.Debugf("listener %s got connection: %s <---> %s",
 			l,
 			maconn.LocalMultiaddr(),
@@ -116,10 +120,6 @@ func (l *listener) handleIncoming() {
 				conn.Close()
 			}
 		}()
-
-		// The go routine above calls Release when the context is
-		// canceled so there's no need to wait on it here.
-		l.threshold.Wait()
 	}
 }
 

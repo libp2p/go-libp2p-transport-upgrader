@@ -8,10 +8,10 @@ import (
 	"time"
 
 	peer "github.com/libp2p/go-libp2p-peer"
-	st "github.com/libp2p/go-libp2p-stream-transport"
+	st "github.com/libp2p/go-libp2p-transport-upgrader"
 	tpt "github.com/libp2p/go-libp2p-transport"
 	smux "github.com/libp2p/go-stream-muxer"
-	ss "github.com/libp2p/go-stream-security"
+	ss "github.com/libp2p/go-conn-security"
 	tcp "github.com/libp2p/go-tcp-transport"
 	ma "github.com/multiformats/go-multiaddr"
 	yamux "github.com/whyrusleeping/go-smux-yamux"

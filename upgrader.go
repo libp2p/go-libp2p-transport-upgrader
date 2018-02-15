@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net"
 
+	ss "github.com/libp2p/go-conn-security"
 	pnet "github.com/libp2p/go-libp2p-interface-pnet"
 	peer "github.com/libp2p/go-libp2p-peer"
 	transport "github.com/libp2p/go-libp2p-transport"
 	filter "github.com/libp2p/go-maddr-filter"
 	smux "github.com/libp2p/go-stream-muxer"
-	ss "github.com/libp2p/go-conn-security"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 

@@ -7,11 +7,11 @@ import (
 	"sync"
 	"time"
 
+	insecure "github.com/libp2p/go-conn-security/insecure"
 	peer "github.com/libp2p/go-libp2p-peer"
-	st "github.com/libp2p/go-libp2p-transport-upgrader"
 	tpt "github.com/libp2p/go-libp2p-transport"
+	st "github.com/libp2p/go-libp2p-transport-upgrader"
 	smux "github.com/libp2p/go-stream-muxer"
-	ss "github.com/libp2p/go-conn-security"
 	tcp "github.com/libp2p/go-tcp-transport"
 	ma "github.com/multiformats/go-multiaddr"
 	yamux "github.com/whyrusleeping/go-smux-yamux"
@@ -64,7 +64,7 @@ func (m *errorMuxer) NewConn(c net.Conn, isServer bool) (smux.Conn, error) {
 var _ = Describe("Listener", func() {
 	var (
 		defaultUpgrader = &st.Upgrader{
-			Secure: ss.NewInsecureTransport(peer.ID(1)),
+			Secure: insecure.New(peer.ID(1)),
 			Muxer:  &negotiatingMuxer{},
 		}
 	)
@@ -136,7 +136,7 @@ var _ = Describe("Listener", func() {
 
 	It("doesn't accept connections that fail to setup", func() {
 		upgrader := &st.Upgrader{
-			Secure: ss.NewInsecureTransport(peer.ID(1)),
+			Secure: insecure.New(peer.ID(1)),
 			Muxer:  &errorMuxer{},
 		}
 		ln := createListener(upgrader)
@@ -158,7 +158,7 @@ var _ = Describe("Listener", func() {
 			num := 3 * st.AcceptQueueLength
 			bm := newBlockingMuxer()
 			upgrader := &st.Upgrader{
-				Secure: ss.NewInsecureTransport(peer.ID(1)),
+				Secure: insecure.New(peer.ID(1)),
 				Muxer:  bm,
 			}
 			ln := createListener(upgrader)

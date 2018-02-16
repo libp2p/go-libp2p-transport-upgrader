@@ -125,8 +125,11 @@ func (l *listener) handleIncoming() {
 
 // Accept accepts a connection.
 func (l *listener) Accept() (transport.Conn, error) {
-	if c, ok := <-l.incoming; ok {
-		return c, nil
+	for c := range l.incoming {
+		// Could have been sitting there for a while.
+		if !c.IsClosed() {
+			return c, nil
+		}
 	}
 	return nil, l.err
 }

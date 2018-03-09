@@ -53,7 +53,73 @@ gx-go --rewrite
 
 Please check [Gx](https://github.com/whyrusleeping/gx) and [Gx-go](https://github.com/whyrusleeping/gx-go) documentation for more information.
 
-For more information about how `go-libp2p-transport-upgrader` is used in the libp2p context, you can see the [go-libp2p-conn](https://github.com/libp2p/go-libp2p-conn) module.
+## Example
+
+Below is a simplified TCP transport implementation using the transport upgrader. In practice, you'll want to use [go-tcp-transport](https://github.com/libp2p/go-tcp-transport) (which has reuseport support).
+
+```go
+package tcptransport
+
+import (
+	"context"
+
+	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
+
+	ma "github.com/multiformats/go-multiaddr"
+	mafmt "github.com/whyrusleeping/mafmt"
+	manet "github.com/multiformats/go-multiaddr-net"
+	tpt "github.com/libp2p/go-libp2p-transport"
+)
+
+// TcpTransport is a simple TCP transport.
+type TcpTransport struct {
+	// Connection upgrader for upgrading insecure stream connections to
+	// secure multiplex connections.
+	Upgrader *tptu.Upgrader
+}
+
+var _ tpt.Transport = &TcpTransport{}
+
+// NewTCPTransport creates a new TCP transport instance.
+func NewTCPTransport(upgrader *tptu.Upgrader) *TcpTransport {
+	return &TcpTransport{Upgrader: upgrader}
+}
+
+// CanDial returns true if this transport believes it can dial the given
+// multiaddr.
+func (t *TcpTransport) CanDial(addr ma.Multiaddr) bool {
+	return mafmt.TCP.Matches(addr)
+}
+
+// Dial dials the peer at the remote address.
+func (t *TcpTransport) Dial(ctx context.Context, raddr ma.Multiaddr, p peer.ID) (tpt.Conn, error) {
+    var dialer manet.Dialer
+    conn, err := dialer.DialContext(ctx, raddr)
+	if err != nil {
+		return nil, err
+	}
+	return t.Upgrader.UpgradeOutbound(ctx, t, conn, p)
+}
+
+// Listen listens on the given multiaddr.
+func (t *TcpTransport) Listen(laddr ma.Multiaddr) (tpt.Listener, error) {
+	list, err := manet.Listen(laddr)
+	if err != nil {
+		return nil, err
+	}
+	return t.Upgrader.UpgradeListener(t, list), nil
+}
+
+// Protocols returns the list of terminal protocols this transport can dial.
+func (t *TcpTransport) Protocols() []int {
+	return []int{ma.P_TCP}
+}
+
+// Proxy always returns false for the TCP transport.
+func (t *TcpTransport) Proxy() bool {
+	return false
+}
+```
 
 ## Contribute
 

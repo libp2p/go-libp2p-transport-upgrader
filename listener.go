@@ -49,6 +49,15 @@ func (l *listener) Close() error {
 	return err
 }
 
+// handles inbound connections.
+//
+// This function does a few interesting things that should be noted:
+//
+// 1. It logs and discards temporary/transient errors (errors with a Temporary()
+//    function that returns true).
+// 2. It stops accepting new connections once AcceptQueueLength connections have
+//    been fully negotiated but not accepted. This gives us a basic backpressure
+//    mechanism while still allowing us to negotiate connections in parallel.
 func (l *listener) handleIncoming() {
 	var wg sync.WaitGroup
 	defer func() {
@@ -66,6 +75,7 @@ func (l *listener) handleIncoming() {
 	for l.ctx.Err() == nil {
 		maconn, err := l.Listener.Accept()
 		if err != nil {
+			// Note: function may pause the accept loop.
 			if catcher.IsTemporary(err) {
 				log.Infof("temporary accept error: %s", err)
 				continue
@@ -74,7 +84,7 @@ func (l *listener) handleIncoming() {
 			return
 		}
 
-		// The go routine above calls Release when the context is
+		// The go routine below calls Release when the context is
 		// canceled so there's no need to wait on it here.
 		l.threshold.Wait()
 
@@ -103,6 +113,11 @@ func (l *listener) handleIncoming() {
 
 			log.Debugf("listener %s accepted connection: %s", l, conn)
 
+			// This records the fact that the connection has been
+			// setup and is waiting to be accepted. This call
+			// *never* blocks, even if we go over the threshold. It
+			// simply ensures that calls to Wait block while we're
+			// over the threshold.
 			l.threshold.Acquire()
 			defer l.threshold.Release()
 

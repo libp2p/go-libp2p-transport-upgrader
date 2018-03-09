@@ -77,6 +77,10 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 			return nil, err
 		}
 		conn = pconn
+	} else if pnet.ForcePrivateNetwork {
+		log.Error("tried to dial with no Private Network Protector but usage" +
+			" of Private Networks is forced by the enviroment")
+		return nil, pnet.ErrNotInPrivateNetwork
 	}
 	sconn, err := u.setupSecurity(ctx, conn, p)
 	if err != nil {

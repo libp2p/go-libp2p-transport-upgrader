@@ -14,13 +14,13 @@ import (
 	smux "github.com/libp2p/go-stream-muxer"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
-	yamux "github.com/whyrusleeping/go-smux-yamux"
+	mplex "github.com/whyrusleeping/go-smux-multiplex"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-// negotiatingMuxer sets up a new yamux connection
+// negotiatingMuxer sets up a new mplex connection
 // It makes sure that this happens at the same time for client and server.
 type negotiatingMuxer struct{}
 
@@ -35,7 +35,7 @@ func (m *negotiatingMuxer) NewConn(c net.Conn, isServer bool) (smux.Conn, error)
 	if err != nil {
 		return nil, err
 	}
-	return yamux.DefaultTransport.NewConn(c, isServer)
+	return mplex.DefaultTransport.NewConn(c, isServer)
 }
 
 // blockingMuxer blocks the muxer negotiation until the contain chan is closed

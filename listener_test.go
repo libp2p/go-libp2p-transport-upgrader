@@ -12,8 +12,8 @@ import (
 	tpt "github.com/libp2p/go-libp2p-transport"
 	st "github.com/libp2p/go-libp2p-transport-upgrader"
 	smux "github.com/libp2p/go-stream-muxer"
-	tcp "github.com/libp2p/go-tcp-transport"
 	ma "github.com/multiformats/go-multiaddr"
+	manet "github.com/multiformats/go-multiaddr-net"
 	yamux "github.com/whyrusleeping/go-smux-yamux"
 
 	. "github.com/onsi/ginkgo"
@@ -85,9 +85,17 @@ var _ = Describe("Listener", func() {
 	createListener := func(upgrader *st.Upgrader) tpt.Listener {
 		addr, err := ma.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
 		ExpectWithOffset(0, err).ToNot(HaveOccurred())
-		ln, err := tcp.NewTCPTransport(upgrader).Listen(addr)
+		ln, err := manet.Listen(addr)
 		ExpectWithOffset(0, err).ToNot(HaveOccurred())
-		return ln
+		return upgrader.UpgradeListener(nil, ln)
+	}
+
+	dial := func(upgrader *st.Upgrader, raddr ma.Multiaddr, p peer.ID) (tpt.Conn, error) {
+		macon, err := manet.Dial(raddr)
+		if err != nil {
+			return nil, err
+		}
+		return upgrader.UpgradeOutbound(context.Background(), nil, macon, p)
 	}
 
 	BeforeEach(func() {
@@ -96,7 +104,7 @@ var _ = Describe("Listener", func() {
 
 	It("accepts a single connection", func() {
 		ln := createListener(defaultUpgrader)
-		cconn, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(1))
+		cconn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(1))
 		Expect(err).ToNot(HaveOccurred())
 		sconn, err := ln.Accept()
 		Expect(err).ToNot(HaveOccurred())
@@ -107,7 +115,7 @@ var _ = Describe("Listener", func() {
 		ln := createListener(defaultUpgrader)
 		const num = 10
 		for i := 0; i < 10; i++ {
-			cconn, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(1))
+			cconn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(1))
 			Expect(err).ToNot(HaveOccurred())
 			sconn, err := ln.Accept()
 			Expect(err).ToNot(HaveOccurred())
@@ -119,7 +127,7 @@ var _ = Describe("Listener", func() {
 		const timeout = 200 * time.Millisecond
 		tpt.AcceptTimeout = timeout
 		ln := createListener(defaultUpgrader)
-		conn, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(2))
+		conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
 		Expect(err).ToNot(HaveOccurred())
 		done := make(chan struct{})
 		go func() {
@@ -146,7 +154,7 @@ var _ = Describe("Listener", func() {
 			_, _ = ln.Accept()
 			close(done)
 		}()
-		_, _ = tcp.NewTCPTransport(upgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(2))
+		_, _ = dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
 		Consistently(done).ShouldNot(BeClosed())
 		// make the goroutine return
 		ln.Close()
@@ -179,7 +187,7 @@ var _ = Describe("Listener", func() {
 				wg.Add(1)
 				go func() {
 					defer GinkgoRecover()
-					_, err := tcp.NewTCPTransport(upgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(2))
+					_, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
 					Expect(err).ToNot(HaveOccurred())
 					wg.Done()
 				}()
@@ -198,7 +206,7 @@ var _ = Describe("Listener", func() {
 			for i := 0; i < st.AcceptQueueLength; i++ {
 				go func() {
 					defer GinkgoRecover()
-					_, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(2))
+					_, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
 					Expect(err).ToNot(HaveOccurred())
 					dialed <- struct{}{}
 				}()
@@ -207,7 +215,7 @@ var _ = Describe("Listener", func() {
 			// dial a new connection. This connection should not complete setup, since the queue is full
 			go func() {
 				defer GinkgoRecover()
-				_, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(2))
+				_, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
 				Expect(err).ToNot(HaveOccurred())
 				dialed <- struct{}{}
 			}()
@@ -238,13 +246,13 @@ var _ = Describe("Listener", func() {
 		It("doesn't accept new connections when it is closed", func() {
 			ln := createListener(defaultUpgrader)
 			Expect(ln.Close()).To(Succeed())
-			_, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(1))
+			_, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(1))
 			Expect(err).To(HaveOccurred())
 		})
 
 		It("closes incoming connections that have not yet been accepted", func() {
 			ln := createListener(defaultUpgrader)
-			conn, err := tcp.NewTCPTransport(defaultUpgrader).Dial(context.Background(), ln.Multiaddr(), peer.ID(2))
+			conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
 			Expect(conn.IsClosed()).To(BeFalse())
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ln.Close()).To(Succeed())

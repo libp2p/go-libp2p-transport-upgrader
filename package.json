@@ -45,9 +45,9 @@
     },
     {
       "author": "whyrusleeping",
-      "hash": "QmYsbnP57nNUKWijs8o2q3ZFrSUcAGTdKoQPuSJC3Uxt1Y",
+      "hash": "QmQvMxiavoMJzuLPuqrzVX4nXZpMks29hqpv13d81aJNEF",
       "name": "go-smux-multiplex",
-      "version": "3.0.13"
+      "version": "3.0.15"
     },
     {
       "author": "multiformats",
@@ -96,6 +96,6 @@
   "license": "",
   "name": "go-libp2p-transport-upgrader",
   "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
-  "version": "0.1.12"
+  "version": "0.1.13"
 }
 

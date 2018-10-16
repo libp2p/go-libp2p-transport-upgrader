@@ -9,9 +9,9 @@
   "gxDependencies": [
     {
       "author": "Stebalien",
-      "hash": "QmSjwssnWNJvzwD77yWruH2ebqwMNR6PCn49hbDURYH9d8",
+      "hash": "QmWHvBCfAZjQuZjKZaY76e9XRCupRpJkAsq9cLskVma4kd",
       "name": "go-conn-security",
-      "version": "0.1.13"
+      "version": "0.1.14"
     },
     {
       "author": "whyrusleeping",
@@ -27,9 +27,9 @@
     },
     {
       "author": "whyrusleeping",
-      "hash": "QmQx3dbLZqokcGsMbaj2KYoQQ6PBZZGvqiTn8rRNyk7H51",
+      "hash": "QmU9oQsh4im7bin6rPMALL2gMH84wPPY4CvasvhjhzRGzJ",
       "name": "go-libp2p-transport",
-      "version": "3.0.13"
+      "version": "3.0.14"
     },
     {
       "author": "libp2p",
@@ -39,9 +39,9 @@
     },
     {
       "author": "whyrusleeping",
-      "hash": "QmbNepETomvmXfz1X5pHNFD2QuPqnqi47dTd94QJWSorQ3",
+      "hash": "QmTRhk7cgjUf2gfQ3p2M9KPECNZEW9XUrmHcFCgog4cPgB",
       "name": "go-libp2p-peer",
-      "version": "2.3.8"
+      "version": "2.4.0"
     },
     {
       "author": "whyrusleeping",
@@ -74,9 +74,9 @@
     },
     {
       "author": "whyrusleeping",
-      "hash": "QmSTaEYUgDe1r581hxyd2u9582Hgp3KX4wGwYbRqz2u9Qh",
+      "hash": "QmaNMjwCgftJwZHVUJU24ySvPMFeEnHzVnnmCpNsKZguTB",
       "name": "go-libp2p-net",
-      "version": "3.0.13"
+      "version": "3.0.14"
     },
     {
       "author": "onsi",
@@ -96,6 +96,6 @@
   "license": "",
   "name": "go-libp2p-transport-upgrader",
   "releaseCmd": "git commit -a -m \"gx publish $VERSION\"",
-  "version": "0.1.14"
+  "version": "0.1.15"
 }
 

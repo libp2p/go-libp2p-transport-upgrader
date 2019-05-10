@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"time"
 
+	dbuf "github.com/Stebalien/go-dbuf"
 	ss "github.com/libp2p/go-conn-security"
 	pnet "github.com/libp2p/go-libp2p-interface-pnet"
+	inet "github.com/libp2p/go-libp2p-net"
 	peer "github.com/libp2p/go-libp2p-peer"
 	transport "github.com/libp2p/go-libp2p-transport"
 	filter "github.com/libp2p/go-maddr-filter"
@@ -62,6 +66,16 @@ func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, ma
 	return u.upgrade(ctx, t, maconn, "")
 }
 
+type notwrite interface {
+	io.Reader
+	inet.ConnSecurity
+	LocalAddr() net.Addr
+	RemoteAddr() net.Addr
+	SetDeadline(t time.Time) error
+	SetReadDeadline(t time.Time) error
+	SetWriteDeadline(t time.Time) error
+}
+
 func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.Conn, error) {
 	if u.Filters != nil && u.Filters.AddrBlocked(maconn.RemoteMultiaddr()) {
 		log.Debugf("blocked connection from %s", maconn.RemoteMultiaddr())
@@ -87,6 +101,11 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
 	}
+	sconn = struct {
+		io.WriteCloser
+		notwrite
+	}{dbuf.NewWriter(sconn), sconn}
+
 	smconn, err := u.setupMuxer(ctx, sconn, p)
 	if err != nil {
 		sconn.Close()

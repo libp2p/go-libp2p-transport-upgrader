@@ -1,5 +1,7 @@
 github.com/AndreasBriese/bbloom v0.0.0-20180913140656-343706a395b7/go.mod h1:bOvUY6CB00SOBii9/FifXqc0awNKxLFCL/+pkDPuyl8=
 github.com/Kubuxu/go-os-helper v0.0.1/go.mod h1:N8B+I7vPCT80IcP58r50u4+gEEcsZETFUpAzWW2ep1Y=
+github.com/Stebalien/go-dbuf v0.0.0-20190510190534-6db3381d14ea h1:O6EHZpSAV/rGEAxkuczXOmBNLKW/KWiIe6IHewAGc+Q=
+github.com/Stebalien/go-dbuf v0.0.0-20190510190534-6db3381d14ea/go.mod h1:SA8BEWXq5McGcBh5EitVi0mJMcssnzeMvuF1FHB02Ms=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
 github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32 h1:qkOC5Gd33k54tobS36cXdAzJbeHaduLtnLQQwNoIi78=
 github.com/btcsuite/btcd v0.0.0-20190213025234-306aecffea32/go.mod h1:DrZx5ec/dmnfpw9KyYoQyYo7d0KEvTkk/5M/vbZjAr8=

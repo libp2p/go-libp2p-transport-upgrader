@@ -84,11 +84,13 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}
 	sconn, err := u.setupSecurity(ctx, conn, p)
 	if err != nil {
+		log.Errorf("failed to negotiate security protocol with %s: %s", maconn.RemoteMultiaddr(), err)
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
 	}
 	smconn, err := u.setupMuxer(ctx, sconn, p)
 	if err != nil {
+		log.Errorf("failed to set up muxer with %s: %s", maconn.RemoteMultiaddr(), err)
 		sconn.Close()
 		return nil, fmt.Errorf("failed to negotiate security stream multiplexer: %s", err)
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync/atomic"
 
 	ss "github.com/libp2p/go-conn-security"
 	pnet "github.com/libp2p/go-libp2p-interface-pnet"
@@ -21,6 +22,11 @@ var ErrNilPeer = errors.New("nil peer")
 
 // AcceptQueueLength is the number of connections to fully setup before not accepting any new connections
 var AcceptQueueLength = 16
+
+var (
+	handshakeFailures int32
+	muxFailures       int32
+)
 
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
@@ -84,13 +90,17 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}
 	sconn, err := u.setupSecurity(ctx, conn, p)
 	if err != nil {
-		log.Errorf("failed to negotiate security protocol with %s: %s", maconn.RemoteMultiaddr(), err)
+		if failures := atomic.AddInt32(&handshakeFailures, 1); failures%1000 == 0 {
+			log.Errorf("Handshake failures: %d", failures)
+		}
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
 	}
 	smconn, err := u.setupMuxer(ctx, sconn, p)
 	if err != nil {
-		log.Errorf("failed to set up muxer with %s: %s", maconn.RemoteMultiaddr(), err)
+		if failures := atomic.AddInt32(&muxFailures, 1); failures%1000 == 0 {
+			log.Errorf("Muxer setup failures: %d", failures)
+		}
 		sconn.Close()
 		return nil, fmt.Errorf("failed to negotiate security stream multiplexer: %s", err)
 	}

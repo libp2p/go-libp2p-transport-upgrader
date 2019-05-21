@@ -9,11 +9,10 @@ require (
 	github.com/libp2p/go-libp2p-peer v0.0.1
 	github.com/libp2p/go-libp2p-transport v0.0.1
 	github.com/libp2p/go-maddr-filter v0.0.1
-	github.com/libp2p/go-mplex v0.0.1 // indirect
 	github.com/libp2p/go-stream-muxer v0.0.1
 	github.com/multiformats/go-multiaddr v0.0.1
 	github.com/multiformats/go-multiaddr-net v0.0.1
 	github.com/onsi/ginkgo v1.7.0
 	github.com/onsi/gomega v1.4.3
-	github.com/whyrusleeping/go-smux-multiplex v3.0.16+incompatible
+	github.com/whyrusleeping/go-smux-multiplex v0.1.0
 )

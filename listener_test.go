@@ -14,7 +14,7 @@ import (
 	smux "github.com/libp2p/go-stream-muxer"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr-net"
-	mplex "github.com/whyrusleeping/go-smux-multiplex"
+	mplex "github.com/libp2p/go-libp2p-mplex"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

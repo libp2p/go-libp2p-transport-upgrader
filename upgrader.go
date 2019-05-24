@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"net"
 
-	ss "github.com/libp2p/go-conn-security"
-	pnet "github.com/libp2p/go-libp2p-interface-pnet"
-	peer "github.com/libp2p/go-libp2p-peer"
-	transport "github.com/libp2p/go-libp2p-transport"
+	core "github.com/libp2p/go-libp2p-core"
+	mux "github.com/libp2p/go-libp2p-core/mux"
+	pnet "github.com/libp2p/go-libp2p-core/pnet"
+	sec "github.com/libp2p/go-libp2p-core/sec"
+	transport "github.com/libp2p/go-libp2p-core/transport"
 	filter "github.com/libp2p/go-maddr-filter"
-	smux "github.com/libp2p/go-stream-muxer"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 
@@ -26,8 +26,8 @@ var AcceptQueueLength = 16
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
 	Protector pnet.Protector
-	Secure    ss.Transport
-	Muxer     smux.Transport
+	Secure    sec.SecureTransport
+	Muxer     mux.Multiplexer
 	Filters   *filter.Filters
 }
 
@@ -39,7 +39,7 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 		upgrader:  u,
 		transport: t,
 		threshold: newThreshold(AcceptQueueLength),
-		incoming:  make(chan transport.Conn),
+		incoming:  make(chan transport.CapableConn),
 		cancel:    cancel,
 		ctx:       ctx,
 	}
@@ -49,7 +49,7 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 
 // UpgradeOutbound upgrades the given outbound multiaddr-net connection into a
 // full libp2p-transport connection.
-func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.Conn, error) {
+func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p core.PeerID) (transport.CapableConn, error) {
 	if p == "" {
 		return nil, ErrNilPeer
 	}
@@ -58,11 +58,11 @@ func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, m
 
 // UpgradeInbound upgrades the given inbound multiaddr-net connection into a
 // full libp2p-transport connection.
-func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.Conn, error) {
+func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
 	return u.upgrade(ctx, t, maconn, "")
 }
 
-func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.Conn, error) {
+func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p core.PeerID) (transport.CapableConn, error) {
 	if u.Filters != nil && u.Filters.AddrBlocked(maconn.RemoteMultiaddr()) {
 		log.Debugf("blocked connection from %s", maconn.RemoteMultiaddr())
 		maconn.Close()
@@ -78,6 +78,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		}
 		conn = pconn
 	} else if pnet.ForcePrivateNetwork {
+		conn.Close()
 		log.Error("tried to dial with no Private Network Protector but usage" +
 			" of Private Networks is forced by the enviroment")
 		return nil, pnet.ErrNotInPrivateNetwork
@@ -93,25 +94,25 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		return nil, fmt.Errorf("failed to negotiate security stream multiplexer: %s", err)
 	}
 	return &transportConn{
-		Conn:           smconn,
+		MuxedConn:      smconn,
 		ConnMultiaddrs: maconn,
 		ConnSecurity:   sconn,
 		transport:      t,
 	}, nil
 }
 
-func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID) (ss.Conn, error) {
+func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p core.PeerID) (sec.SecureConn, error) {
 	if p == "" {
 		return u.Secure.SecureInbound(ctx, conn)
 	}
 	return u.Secure.SecureOutbound(ctx, conn, p)
 }
 
-func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, p peer.ID) (smux.Conn, error) {
+func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, p core.PeerID) (mux.MuxedConn, error) {
 	// TODO: The muxer should take a context.
 	done := make(chan struct{})
 
-	var smconn smux.Conn
+	var smconn mux.MuxedConn
 	var err error
 	go func() {
 		defer close(done)

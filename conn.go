@@ -3,9 +3,9 @@ package stream
 import (
 	"fmt"
 
-	mux "github.com/libp2p/go-libp2p-core/mux"
-	network "github.com/libp2p/go-libp2p-core/network"
-	transport "github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p-core/mux"
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/transport"
 )
 
 type transportConn struct {

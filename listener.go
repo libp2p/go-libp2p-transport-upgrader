@@ -5,13 +5,19 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/transport"
+
 	logging "github.com/ipfs/go-log"
 	tec "github.com/jbenet/go-temp-err-catcher"
-	transport "github.com/libp2p/go-libp2p-core/transport"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 
 var log = logging.Logger("stream-upgrader")
+
+type connErr struct {
+	conn transport.CapableConn
+	err  error
+}
 
 type listener struct {
 	manet.Listener

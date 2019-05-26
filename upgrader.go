@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net"
 
-	core "github.com/libp2p/go-libp2p-core"
-	mux "github.com/libp2p/go-libp2p-core/mux"
-	pnet "github.com/libp2p/go-libp2p-core/pnet"
-	sec "github.com/libp2p/go-libp2p-core/sec"
-	transport "github.com/libp2p/go-libp2p-core/transport"
+	"github.com/libp2p/go-libp2p-core/mux"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/pnet"
+	"github.com/libp2p/go-libp2p-core/sec"
+	"github.com/libp2p/go-libp2p-core/transport"
+
 	filter "github.com/libp2p/go-maddr-filter"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
@@ -49,7 +50,7 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 
 // UpgradeOutbound upgrades the given outbound multiaddr-net connection into a
 // full libp2p-transport connection.
-func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p core.PeerID) (transport.CapableConn, error) {
+func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
 	if p == "" {
 		return nil, ErrNilPeer
 	}
@@ -62,7 +63,7 @@ func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, ma
 	return u.upgrade(ctx, t, maconn, "")
 }
 
-func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p core.PeerID) (transport.CapableConn, error) {
+func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
 	if u.Filters != nil && u.Filters.AddrBlocked(maconn.RemoteMultiaddr()) {
 		log.Debugf("blocked connection from %s", maconn.RemoteMultiaddr())
 		maconn.Close()
@@ -78,7 +79,6 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		}
 		conn = pconn
 	} else if pnet.ForcePrivateNetwork {
-		conn.Close()
 		log.Error("tried to dial with no Private Network Protector but usage" +
 			" of Private Networks is forced by the enviroment")
 		return nil, pnet.ErrNotInPrivateNetwork
@@ -101,14 +101,14 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}, nil
 }
 
-func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p core.PeerID) (sec.SecureConn, error) {
+func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID) (sec.SecureConn, error) {
 	if p == "" {
 		return u.Secure.SecureInbound(ctx, conn)
 	}
 	return u.Secure.SecureOutbound(ctx, conn, p)
 }
 
-func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, p core.PeerID) (mux.MuxedConn, error) {
+func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, p peer.ID) (mux.MuxedConn, error) {
 	// TODO: The muxer should take a context.
 	done := make(chan struct{})
 

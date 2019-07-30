@@ -3,6 +3,7 @@ package stream_test
 import (
 	"context"
 	"errors"
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"net"
 	"sync"
 	"time"
@@ -61,10 +62,23 @@ func (m *errorMuxer) NewConn(c net.Conn, isServer bool) (mux.MuxedConn, error) {
 	return nil, errors.New("mux error")
 }
 
+func makeInsecureTransport() *insecure.Transport {
+	priv, pub, err := crypto.GenerateKeyPair(crypto.Ed25519, 256)
+	if err != nil {
+		panic(err)
+	}
+	id, err := peer.IDFromPublicKey(pub)
+	if err != nil {
+		panic(err)
+	}
+	return insecure.NewWithIdentity(id, priv)
+}
+
 var _ = Describe("Listener", func() {
 	var (
+		insecureTransport = makeInsecureTransport()
 		defaultUpgrader = &st.Upgrader{
-			Secure: insecure.New(peer.ID(1)),
+			Secure: insecureTransport,
 			Muxer:  &negotiatingMuxer{},
 		}
 	)
@@ -105,7 +119,7 @@ var _ = Describe("Listener", func() {
 	It("accepts a single connection", func() {
 		ln := createListener(defaultUpgrader)
 		defer ln.Close()
-		cconn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(1))
+		cconn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 		Expect(err).ToNot(HaveOccurred())
 		sconn, err := ln.Accept()
 		Expect(err).ToNot(HaveOccurred())
@@ -117,7 +131,7 @@ var _ = Describe("Listener", func() {
 		defer ln.Close()
 		const num = 10
 		for i := 0; i < 10; i++ {
-			cconn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(1))
+			cconn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 			Expect(err).ToNot(HaveOccurred())
 			sconn, err := ln.Accept()
 			Expect(err).ToNot(HaveOccurred())
@@ -130,7 +144,7 @@ var _ = Describe("Listener", func() {
 		tpt.AcceptTimeout = timeout
 		ln := createListener(defaultUpgrader)
 		defer ln.Close()
-		conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+		conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 		if !Expect(err).ToNot(HaveOccurred()) {
 			return
 		}
@@ -150,7 +164,7 @@ var _ = Describe("Listener", func() {
 
 	It("doesn't accept connections that fail to setup", func() {
 		upgrader := &st.Upgrader{
-			Secure: insecure.New(peer.ID(1)),
+			Secure: insecureTransport,
 			Muxer:  &errorMuxer{},
 		}
 		ln := createListener(upgrader)
@@ -163,7 +177,7 @@ var _ = Describe("Listener", func() {
 			}
 			close(done)
 		}()
-		conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+		conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 		if !Expect(err).To(HaveOccurred()) {
 			conn.Close()
 		}
@@ -178,7 +192,7 @@ var _ = Describe("Listener", func() {
 			num := 3 * st.AcceptQueueLength
 			bm := newBlockingMuxer()
 			upgrader := &st.Upgrader{
-				Secure: insecure.New(peer.ID(1)),
+				Secure: insecureTransport,
 				Muxer:  bm,
 			}
 			ln := createListener(upgrader)
@@ -200,7 +214,7 @@ var _ = Describe("Listener", func() {
 				wg.Add(1)
 				go func() {
 					defer GinkgoRecover()
-					conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+					conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 					if Expect(err).ToNot(HaveOccurred()) {
 						stream, err := conn.AcceptStream() // wait for conn to be accepted.
 						if !Expect(err).To(HaveOccurred()) {
@@ -227,7 +241,7 @@ var _ = Describe("Listener", func() {
 			for i := 0; i < st.AcceptQueueLength; i++ {
 				go func() {
 					defer GinkgoRecover()
-					conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+					conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 					Expect(err).ToNot(HaveOccurred())
 					dialed <- conn
 				}()
@@ -236,7 +250,7 @@ var _ = Describe("Listener", func() {
 			// dial a new connection. This connection should not complete setup, since the queue is full
 			go func() {
 				defer GinkgoRecover()
-				conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+				conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 				Expect(err).ToNot(HaveOccurred())
 				dialed <- conn
 			}()
@@ -279,7 +293,7 @@ var _ = Describe("Listener", func() {
 		It("doesn't accept new connections when it is closed", func() {
 			ln := createListener(defaultUpgrader)
 			Expect(ln.Close()).To(Succeed())
-			conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(1))
+			conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 			if !Expect(err).To(HaveOccurred()) {
 				conn.Close()
 			}
@@ -287,7 +301,7 @@ var _ = Describe("Listener", func() {
 
 		It("closes incoming connections that have not yet been accepted", func() {
 			ln := createListener(defaultUpgrader)
-			conn, err := dial(defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+			conn, err := dial(defaultUpgrader, ln.Multiaddr(), insecureTransport.LocalPeer())
 			if !Expect(err).ToNot(HaveOccurred()) {
 				ln.Close()
 				return

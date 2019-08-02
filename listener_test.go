@@ -77,7 +77,7 @@ func makeInsecureTransport() *insecure.Transport {
 var _ = Describe("Listener", func() {
 	var (
 		insecureTransport = makeInsecureTransport()
-		defaultUpgrader = &st.Upgrader{
+		defaultUpgrader   = &st.Upgrader{
 			Secure: insecureTransport,
 			Muxer:  &negotiatingMuxer{},
 		}

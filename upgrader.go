@@ -91,7 +91,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	smconn, err := u.setupMuxer(ctx, sconn, p)
 	if err != nil {
 		sconn.Close()
-		return nil, fmt.Errorf("failed to negotiate security stream multiplexer: %s", err)
+		return nil, fmt.Errorf("failed to negotiate stream multiplexer: %s", err)
 	}
 	return &transportConn{
 		MuxedConn:      smconn,

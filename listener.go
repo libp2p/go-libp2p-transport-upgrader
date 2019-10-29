@@ -127,7 +127,7 @@ func (l *listener) handleIncoming() {
 			case <-ctx.Done():
 				if l.ctx.Err() == nil {
 					// Listener *not* closed but the accept timeout expired.
-					log.Warningf("listener dropped connection due to slow accept")
+					log.Warnf("listener dropped connection due to slow accept")
 				}
 				// Wait on the context with a timeout. This way,
 				// if we stop accepting connections for some reason,

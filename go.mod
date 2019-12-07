@@ -7,7 +7,7 @@ require (
 	github.com/libp2p/go-libp2p-mplex v0.2.0
 	github.com/libp2p/go-maddr-filter v0.0.5
 	github.com/multiformats/go-multiaddr v0.0.4
-	github.com/multiformats/go-multiaddr-net v0.0.1
+	github.com/multiformats/go-multiaddr-net v0.1.1
 	github.com/onsi/ginkgo v1.8.0
 	github.com/onsi/gomega v1.7.1
 )

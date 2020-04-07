@@ -8,12 +8,12 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/mux"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	ipnet "github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
 	"github.com/libp2p/go-libp2p-pnet"
 
-	filter "github.com/libp2p/go-maddr-filter"
 	manet "github.com/multiformats/go-multiaddr-net"
 )
 
@@ -27,10 +27,10 @@ var AcceptQueueLength = 16
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
-	PSK     ipnet.PSK
-	Secure  sec.SecureTransport
-	Muxer   mux.Multiplexer
-	Filters *filter.Filters
+	PSK       ipnet.PSK
+	Secure    sec.SecureTransport
+	Muxer     mux.Multiplexer
+	AddrConnGater connmgr.AddressConnectionGater
 }
 
 // UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
@@ -65,7 +65,7 @@ func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, ma
 }
 
 func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
-	if u.Filters != nil && u.Filters.AddrBlocked(maconn.RemoteMultiaddr()) {
+	if u.AddrConnGater != nil && u.AddrConnGater.DenyAddrConnection(maconn.RemoteMultiaddr()) {
 		log.Debugf("blocked connection from %s", maconn.RemoteMultiaddr())
 		maconn.Close()
 		return nil, fmt.Errorf("blocked connection from %s", maconn.RemoteMultiaddr())

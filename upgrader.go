@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/mux"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/connmgr"
 	ipnet "github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
@@ -27,9 +27,9 @@ var AcceptQueueLength = 16
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
-	PSK       ipnet.PSK
-	Secure    sec.SecureTransport
-	Muxer     mux.Multiplexer
+	PSK           ipnet.PSK
+	Secure        sec.SecureTransport
+	Muxer         mux.Multiplexer
 	AddrConnGater connmgr.AddressConnectionGater
 }
 

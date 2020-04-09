@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/network"
 	"net"
 
 	"github.com/libp2p/go-libp2p-core/connmgr"
@@ -27,10 +28,10 @@ var AcceptQueueLength = 16
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
-	PSK           ipnet.PSK
-	Secure        sec.SecureTransport
-	Muxer         mux.Multiplexer
-	AddrConnGater connmgr.AddressConnectionGater
+	PSK       ipnet.PSK
+	Secure    sec.SecureTransport
+	Muxer     mux.Multiplexer
+	ConnGater connmgr.ConnectionGater
 }
 
 // UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
@@ -55,22 +56,20 @@ func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, m
 	if p == "" {
 		return nil, ErrNilPeer
 	}
-	return u.upgrade(ctx, t, maconn, p)
+	return u.upgrade(ctx, t, maconn, p, network.DirOutbound)
 }
 
 // UpgradeInbound upgrades the given inbound multiaddr-net connection into a
 // full libp2p-transport connection.
 func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
-	return u.upgrade(ctx, t, maconn, "")
-}
-
-func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
-	if u.AddrConnGater != nil && u.AddrConnGater.DenyAddrConnection(maconn.RemoteMultiaddr()) {
-		log.Debugf("blocked connection from %s", maconn.RemoteMultiaddr())
-		maconn.Close()
-		return nil, fmt.Errorf("blocked connection from %s", maconn.RemoteMultiaddr())
+	if u.ConnGater != nil && !u.ConnGater.InterceptAccept(maconn) {
+		return nil, processInterceptFailed(maconn, network.DirInbound, "accepted", "")
 	}
 
+	return u.upgrade(ctx, t, maconn, "", network.DirInbound)
+}
+
+func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID, dir network.Direction) (transport.CapableConn, error) {
 	var conn net.Conn = maconn
 	if u.PSK != nil {
 		pconn, err := pnet.NewProtectedConn(u.PSK, conn)
@@ -89,17 +88,40 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
 	}
+	// should we gate the secured connection
+	if u.ConnGater != nil && !u.ConnGater.InterceptSecured(dir, sconn.RemotePeer(), maconn) {
+		return nil, processInterceptFailed(maconn, dir, "secured", sconn.RemotePeer())
+	}
+
 	smconn, err := u.setupMuxer(ctx, sconn, p)
 	if err != nil {
 		sconn.Close()
 		return nil, fmt.Errorf("failed to negotiate stream multiplexer: %s", err)
 	}
-	return &transportConn{
+
+	tc := &transportConn{
 		MuxedConn:      smconn,
 		ConnMultiaddrs: maconn,
 		ConnSecurity:   sconn,
 		transport:      t,
-	}, nil
+	}
+
+	// Gater function for the upgraded connection will be applied in the Swarm as
+	// we need to send a disconnect message for it.
+
+	return tc, nil
+}
+
+func processInterceptFailed(c manet.Conn, dir network.Direction, state string, p peer.ID) error {
+	errStr := fmt.Sprintf("gater blocked connection with peer %s and Addr %s with direction %d in state %s",
+		p.Pretty(), c.RemoteMultiaddr().String(), dir, state)
+
+	log.Debug(errStr)
+	if err := c.Close(); err != nil {
+		log.Errorf("failed to close connection with peerID %s and Addr %s, err=%s",
+			p.Pretty(), c.RemoteMultiaddr().String(), err)
+	}
+	return errors.New(errStr)
 }
 
 func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID) (sec.SecureConn, error) {

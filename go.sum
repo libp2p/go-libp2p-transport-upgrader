@@ -87,6 +87,8 @@ github.com/libp2p/go-libp2p-core v0.5.0 h1:FBQ1fpq2Fo/ClyjojVJ5AKXlKhvNc/B6U0O+7
 github.com/libp2p/go-libp2p-core v0.5.0/go.mod h1:49XGI+kc38oGVwqSBhDEwytaAxgZasHhFfQKibzTls0=
 github.com/libp2p/go-libp2p-core v0.5.2-0.20200407111719-49c747cbf18c h1:mMOcmG1ruBINI7IgYGaJIFTSX1f223kwdPh9oseSUEo=
 github.com/libp2p/go-libp2p-core v0.5.2-0.20200407111719-49c747cbf18c/go.mod h1:uN7L2D4EvPCvzSH5SrhR72UWbnSGpt5/a35Sm4upn4Y=
+github.com/libp2p/go-libp2p-core v0.5.2-0.20200409124714-2f4d34c727d9 h1:06F5u6iQNSiJl3FGTnDZfJtSqtIiMYlELemNQ5myESc=
+github.com/libp2p/go-libp2p-core v0.5.2-0.20200409124714-2f4d34c727d9/go.mod h1:uN7L2D4EvPCvzSH5SrhR72UWbnSGpt5/a35Sm4upn4Y=
 github.com/libp2p/go-libp2p-mplex v0.2.0 h1:vnR+/fUnL5d2kTB1Lfce1KVSP+bCCy2aJIvqvb9cFqE=
 github.com/libp2p/go-libp2p-mplex v0.2.0/go.mod h1:Ejl9IyjvXJ0T9iqUTE1jpYATQ9NM3g+OtR+EMMODbKo=
 github.com/libp2p/go-libp2p-mplex v0.2.1 h1:E1xaJBQnbSiTHGI1gaBKmKhu1TUKkErKJnE8iGvirYI=

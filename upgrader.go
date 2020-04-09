@@ -62,6 +62,7 @@ func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, m
 // UpgradeInbound upgrades the given inbound multiaddr-net connection into a
 // full libp2p-transport connection.
 func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
+	// We should ALSO do this in the transport, but dosen't hurt to have this here.
 	if u.ConnGater != nil && !u.ConnGater.InterceptAccept(maconn) {
 		return nil, processInterceptFailed(maconn, network.DirInbound, "accepted", "")
 	}

@@ -62,11 +62,6 @@ func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, m
 // UpgradeInbound upgrades the given inbound multiaddr-net connection into a
 // full libp2p-transport connection.
 func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
-	// We should ALSO do this in the transport, but dosen't hurt to have this here.
-	if u.ConnGater != nil && !u.ConnGater.InterceptAccept(maconn) {
-		return nil, processInterceptFailed(maconn, network.DirInbound, "accepted", "")
-	}
-
 	return u.upgrade(ctx, t, maconn, "", network.DirInbound)
 }
 
@@ -91,7 +86,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}
 	// should we gate the secured connection
 	if u.ConnGater != nil && !u.ConnGater.InterceptSecured(dir, sconn.RemotePeer(), maconn) {
-		return nil, processInterceptFailed(maconn, dir, "secured", sconn.RemotePeer())
+		return nil, processGatedConnection(maconn, dir, "secured", sconn.RemotePeer())
 	}
 
 	smconn, err := u.setupMuxer(ctx, sconn, p)
@@ -113,7 +108,9 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	return tc, nil
 }
 
-func processInterceptFailed(c manet.Conn, dir network.Direction, state string, p peer.ID) error {
+// closes the connection, does some debug logging and constructs an appropriate error
+// for the caller
+func processGatedConnection(c manet.Conn, dir network.Direction, state string, p peer.ID) error {
 	errStr := fmt.Sprintf("gater blocked connection with peer %s and Addr %s with direction %d in state %s",
 		p.Pretty(), c.RemoteMultiaddr().String(), dir, state)
 

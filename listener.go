@@ -3,6 +3,7 @@ package stream
 import (
 	"context"
 	"fmt"
+	"github.com/libp2p/go-libp2p-core/network"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/transport"
@@ -83,6 +84,12 @@ func (l *listener) handleIncoming() {
 			}
 			l.err = err
 			return
+		}
+
+		// gate the connection if applicable
+		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {
+			processGatedConnection(maconn, network.DirInbound, "accepted", "")
+			continue
 		}
 
 		// The go routine below calls Release when the context is

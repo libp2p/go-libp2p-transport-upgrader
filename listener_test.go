@@ -314,25 +314,29 @@ func TestListenerConnectionGater(t *testing.T) {
 	_ = conn.Close()
 
 	// rejecting after handshake.
-	testGater.BlockSecured, testGater.BlockAccept = true, false
+	testGater.BlockSecured(true)
+	testGater.BlockAccept(false)
 	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting on accept will trigger first.
-	testGater.BlockSecured, testGater.BlockAccept = true, true
+	testGater.BlockSecured(true)
+	testGater.BlockAccept(true)
 	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting only on acceptance.
-	testGater.BlockSecured, testGater.BlockAccept = false, true
+	testGater.BlockSecured(false)
+	testGater.BlockAccept(true)
 	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
 	require.Error(err)
 	require.Nil(conn)
 
 	// back to normal
-	testGater.BlockSecured, testGater.BlockAccept = false, false
+	testGater.BlockSecured(false)
+	testGater.BlockAccept(false)
 	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
 	require.NoError(err)
 	require.False(conn.IsClosed())

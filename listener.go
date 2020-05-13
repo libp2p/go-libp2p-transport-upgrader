@@ -88,6 +88,12 @@ func (l *listener) handleIncoming() {
 
 		// gate the connection if applicable
 		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {
+			if err := maconn.Close(); err != nil {
+				log.Errorf("failed to close connection with peer %s and addr %s; err: %s",
+					p.Pretty(), maconn.RemoteMultiaddr(), err)
+			}
+			return nil, fmt.Errorf("gater blocked secured connection with peer %s and addr %s with direction %d",
+				sconn.RemotePeer().Pretty(), maconn.RemoteMultiaddr(), dir)
 			processGatedConnection(maconn, network.DirInbound, "accepted", "")
 			continue
 		}

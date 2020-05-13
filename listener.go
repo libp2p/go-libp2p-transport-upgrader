@@ -3,7 +3,6 @@ package stream
 import (
 	"context"
 	"fmt"
-	"github.com/libp2p/go-libp2p-core/network"
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/transport"
@@ -88,13 +87,12 @@ func (l *listener) handleIncoming() {
 
 		// gate the connection if applicable
 		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {
+			log.Debugf("gater blocked incoming connection on local addr %s from %s",
+				maconn.LocalMultiaddr(), maconn.RemoteMultiaddr())
+
 			if err := maconn.Close(); err != nil {
-				log.Errorf("failed to close connection with peer %s and addr %s; err: %s",
-					p.Pretty(), maconn.RemoteMultiaddr(), err)
+				log.Warnf("failed to incoming connection rejected by gater; err: %s", err)
 			}
-			return nil, fmt.Errorf("gater blocked secured connection with peer %s and addr %s with direction %d",
-				sconn.RemotePeer().Pretty(), maconn.RemoteMultiaddr(), dir)
-			processGatedConnection(maconn, network.DirInbound, "accepted", "")
 			continue
 		}
 

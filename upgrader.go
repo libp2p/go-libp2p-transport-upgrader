@@ -79,6 +79,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 			" of Private Networks is forced by the enviroment")
 		return nil, ipnet.ErrNotInPrivateNetwork
 	}
+
 	sconn, err := u.setupSecurity(ctx, conn, p)
 	if err != nil {
 		conn.Close()
@@ -107,7 +108,6 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		ConnSecurity:   sconn,
 		transport:      t,
 	}
-
 	return tc, nil
 }
 

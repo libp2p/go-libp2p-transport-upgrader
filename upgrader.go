@@ -84,16 +84,19 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 			" of Private Networks is forced by the enviroment")
 		return nil, ipnet.ErrNotInPrivateNetwork
 	}
+
 	sconn, err := u.setupSecurity(ctx, conn, p)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("failed to negotiate security protocol: %s", err)
 	}
+
 	smconn, err := u.setupMuxer(ctx, sconn, p)
 	if err != nil {
 		sconn.Close()
 		return nil, fmt.Errorf("failed to negotiate stream multiplexer: %s", err)
 	}
+
 	return &transportConn{
 		MuxedConn:      smconn,
 		ConnMultiaddrs: maconn,

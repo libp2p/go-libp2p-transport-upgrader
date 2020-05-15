@@ -10,5 +10,5 @@ require (
 	github.com/libp2p/go-libp2p-pnet v0.2.0
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/multiformats/go-multiaddr-net v0.1.5
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 )

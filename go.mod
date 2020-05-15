@@ -8,8 +8,8 @@ require (
 	github.com/libp2p/go-libp2p-core v0.5.3
 	github.com/libp2p/go-libp2p-mplex v0.2.3
 	github.com/libp2p/go-libp2p-pnet v0.2.0
-	github.com/libp2p/go-maddr-filter v0.0.5
-	github.com/multiformats/go-multiaddr v0.2.1
+	github.com/libp2p/go-maddr-filter v0.1.0
+	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/multiformats/go-multiaddr-net v0.1.5
 	github.com/stretchr/testify v1.4.0
 )

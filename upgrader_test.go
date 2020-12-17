@@ -22,7 +22,7 @@ import (
 
 var (
 	defaultUpgrader = &st.Upgrader{
-		Secure: insecure.New(peer.ID(1)),
+		Secure: insecure.New(peer.ID("1")),
 		Muxer:  &negotiatingMuxer{},
 	}
 )
@@ -113,21 +113,21 @@ func TestOutboundConnectionGating(t *testing.T) {
 	upgrader := *defaultUpgrader
 	upgrader.ConnGater = testGater
 
-	conn, err := dial(t, &upgrader, ln.Multiaddr(), peer.ID(2))
+	conn, err := dial(t, &upgrader, ln.Multiaddr(), peer.ID("2"))
 	require.NoError(err)
 	require.NotNil(conn)
 	_ = conn.Close()
 
 	// blocking accepts doesn't affect the dialling side, only the listener.
 	testGater.BlockAccept(true)
-	conn, err = dial(t, &upgrader, ln.Multiaddr(), peer.ID(2))
+	conn, err = dial(t, &upgrader, ln.Multiaddr(), peer.ID("2"))
 	require.NoError(err)
 	require.NotNil(conn)
 	_ = conn.Close()
 
 	// now let's block all connections after being secured.
 	testGater.BlockSecured(true)
-	conn, err = dial(t, &upgrader, ln.Multiaddr(), peer.ID(2))
+	conn, err = dial(t, &upgrader, ln.Multiaddr(), peer.ID("2"))
 	require.Error(err)
 	require.Contains(err.Error(), "gater rejected connection")
 	require.Nil(conn)

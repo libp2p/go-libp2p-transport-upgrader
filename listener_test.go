@@ -1,6 +1,7 @@
 package stream_test
 
 import (
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -41,7 +42,7 @@ func TestAcceptSingleConn(t *testing.T) {
 	ln := createListener(t, defaultUpgrader)
 	defer ln.Close()
 
-	cconn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(1))
+	cconn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("1"))
 	require.NoError(err)
 
 	sconn, err := ln.Accept()
@@ -64,7 +65,7 @@ func TestAcceptMultipleConns(t *testing.T) {
 	}()
 
 	for i := 0; i < 10; i++ {
-		cconn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(1))
+		cconn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("1"))
 		require.NoError(err)
 		toClose = append(toClose, cconn)
 
@@ -86,7 +87,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	ln := createListener(t, defaultUpgrader)
 	defer ln.Close()
 
-	conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+	conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
 	require.NoError(err)
 
 	errCh := make(chan error)
@@ -117,7 +118,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 	require := require.New(t)
 
 	upgrader := &st.Upgrader{
-		Secure: insecure.New(peer.ID(1)),
+		Secure: insecure.New(peer.ID("1")),
 		Muxer:  &errorMuxer{},
 	}
 
@@ -130,7 +131,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 		errCh <- err
 	}()
 
-	_, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+	_, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
 	require.Error(err)
 
 	// close the listener.
@@ -164,7 +165,7 @@ func TestListenerClose(t *testing.T) {
 	require.Contains(err.Error(), "use of closed network connection")
 
 	// doesn't accept new connections when it is closed
-	_, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(1))
+	_, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("1"))
 	require.Error(err)
 }
 
@@ -175,7 +176,7 @@ func TestListenerCloseClosesQueued(t *testing.T) {
 
 	var conns []transport.CapableConn
 	for i := 0; i < 10; i++ {
-		conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(i))
+		conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(fmt.Sprintf("%d", i)))
 		require.NoError(err)
 		conns = append(conns, conn)
 	}
@@ -213,7 +214,7 @@ func TestConcurrentAccept(t *testing.T) {
 		num           = 3 * st.AcceptQueueLength
 		blockingMuxer = newBlockingMuxer()
 		upgrader      = &st.Upgrader{
-			Secure: insecure.New(peer.ID(1)),
+			Secure: insecure.New(peer.ID("1")),
 			Muxer:  blockingMuxer,
 		}
 	)
@@ -241,7 +242,7 @@ func TestConcurrentAccept(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+			conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
 			if err != nil {
 				errCh <- err
 				return
@@ -270,7 +271,7 @@ func TestAcceptQueueBacklogged(t *testing.T) {
 	// setup AcceptQueueLength connections, but don't accept any of them
 	errCh := make(chan error, st.AcceptQueueLength+1)
 	doDial := func() {
-		conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(2))
+		conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
 		errCh <- err
 		if conn != nil {
 			_ = conn.Close()
@@ -308,7 +309,7 @@ func TestListenerConnectionGater(t *testing.T) {
 	defer ln.Close()
 
 	// no gating.
-	conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
+	conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
 	require.NoError(err)
 	require.False(conn.IsClosed())
 	_ = conn.Close()
@@ -316,28 +317,28 @@ func TestListenerConnectionGater(t *testing.T) {
 	// rejecting after handshake.
 	testGater.BlockSecured(true)
 	testGater.BlockAccept(false)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
+	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting on accept will trigger first.
 	testGater.BlockSecured(true)
 	testGater.BlockAccept(true)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
+	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting only on acceptance.
 	testGater.BlockSecured(false)
 	testGater.BlockAccept(true)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
+	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
 	require.Error(err)
 	require.Nil(conn)
 
 	// back to normal
 	testGater.BlockSecured(false)
 	testGater.BlockAccept(false)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(0))
+	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
 	require.NoError(err)
 	require.False(conn.IsClosed())
 	_ = conn.Close()

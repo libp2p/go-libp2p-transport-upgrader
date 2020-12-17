@@ -1,6 +1,7 @@
 package stream_test
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -93,7 +94,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	errCh := make(chan error)
 	go func() {
 		defer conn.Close()
-		str, err := conn.OpenStream()
+		str, err := conn.OpenStream(context.Background())
 		if err != nil {
 			errCh <- err
 			return

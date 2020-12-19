@@ -78,7 +78,7 @@ func testConn(t *testing.T, clientConn, serverConn transport.CapableConn) {
 	t.Helper()
 	require := require.New(t)
 
-	cstr, err := clientConn.OpenStream()
+	cstr, err := clientConn.OpenStream(context.Background())
 	require.NoError(err)
 
 	_, err = cstr.Write([]byte("foobar"))

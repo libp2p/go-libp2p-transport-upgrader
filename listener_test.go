@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/sec/insecure"
 	"github.com/libp2p/go-libp2p-core/transport"
 
@@ -22,6 +24,20 @@ import (
 
 func init() {
 	transport.AcceptTimeout = 1 * time.Hour
+}
+
+type MuxAdapter struct {
+	tpt sec.SecureTransport
+}
+
+func (mux *MuxAdapter) SecureInbound(ctx context.Context, insecure net.Conn) (sec.SecureConn, bool, error) {
+	sconn, err := mux.tpt.SecureInbound(ctx, insecure)
+	return sconn, true, err
+}
+
+func (mux *MuxAdapter) SecureOutbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, bool, error) {
+	sconn, err := mux.tpt.SecureOutbound(ctx, insecure, p)
+	return sconn, false, err
 }
 
 func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
@@ -119,7 +135,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 	require := require.New(t)
 
 	upgrader := &st.Upgrader{
-		Secure: insecure.New(peer.ID("1")),
+		Secure: &MuxAdapter{tpt: insecure.New(peer.ID("1"))},
 		Muxer:  &errorMuxer{},
 	}
 
@@ -215,7 +231,7 @@ func TestConcurrentAccept(t *testing.T) {
 		num           = 3 * st.AcceptQueueLength
 		blockingMuxer = newBlockingMuxer()
 		upgrader      = &st.Upgrader{
-			Secure: insecure.New(peer.ID("1")),
+			Secure: &MuxAdapter{tpt: insecure.New(peer.ID("1"))},
 			Muxer:  blockingMuxer,
 		}
 	)

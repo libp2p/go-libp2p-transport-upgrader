@@ -22,7 +22,7 @@ import (
 
 var (
 	defaultUpgrader = &st.Upgrader{
-		Secure: insecure.New(peer.ID("1")),
+		Secure: &MuxAdapter{tpt: insecure.New(peer.ID("1"))},
 		Muxer:  &negotiatingMuxer{},
 	}
 )

@@ -66,6 +66,11 @@ func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, ma
 }
 
 func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID, dir network.Direction) (transport.CapableConn, error) {
+	var stat network.Stat
+	if cs, ok := maconn.(network.ConnStat); ok {
+		stat = cs.Stat()
+	}
+
 	var conn net.Conn = maconn
 	if u.PSK != nil {
 		pconn, err := pnet.NewProtectedConn(u.PSK, conn)
@@ -107,6 +112,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		ConnMultiaddrs: maconn,
 		ConnSecurity:   sconn,
 		transport:      t,
+		stat:           stat,
 	}
 	return tc, nil
 }

@@ -43,7 +43,7 @@ func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
 	t.Helper()
 	require := require.New(t)
 
-	addr, err := ma.NewMultiaddr("/ip4/0.0.0.0/tcp/0")
+	addr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
 	require.NoError(err)
 
 	ln, err := manet.Listen(addr)

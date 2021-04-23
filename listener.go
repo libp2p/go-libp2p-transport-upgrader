@@ -13,11 +13,6 @@ import (
 
 var log = logging.Logger("stream-upgrader")
 
-type connErr struct {
-	conn transport.CapableConn
-	err  error
-}
-
 type listener struct {
 	manet.Listener
 
@@ -137,7 +132,7 @@ func (l *listener) handleIncoming() {
 			case <-ctx.Done():
 				if l.ctx.Err() == nil {
 					// Listener *not* closed but the accept timeout expired.
-					log.Warningf("listener dropped connection due to slow accept")
+					log.Warn("listener dropped connection due to slow accept")
 				}
 				// Wait on the context with a timeout. This way,
 				// if we stop accepting connections for some reason,

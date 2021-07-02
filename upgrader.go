@@ -79,8 +79,7 @@ func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 		}
 		conn = pconn
 	} else if ipnet.ForcePrivateNetwork {
-		log.Error("tried to dial with no Private Network Protector but usage" +
-			" of Private Networks is forced by the enviroment")
+		log.Error("tried to dial with no Private Network Protector but usage of Private Networks is forced by the environment")
 		return nil, ipnet.ErrNotInPrivateNetwork
 	}
 

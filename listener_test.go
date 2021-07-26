@@ -2,7 +2,6 @@ package stream_test
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -11,9 +10,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/sec"
-	"github.com/libp2p/go-libp2p-core/sec/insecure"
 	"github.com/libp2p/go-libp2p-core/transport"
-
 	st "github.com/libp2p/go-libp2p-transport-upgrader"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -41,24 +38,21 @@ func (mux *MuxAdapter) SecureOutbound(ctx context.Context, insecure net.Conn, p 
 
 func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
 	t.Helper()
-	require := require.New(t)
-
 	addr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
-	require.NoError(err)
-
+	require.NoError(t, err)
 	ln, err := manet.Listen(addr)
-	require.NoError(err)
-
+	require.NoError(t, err)
 	return upgrader.UpgradeListener(nil, ln)
 }
 
 func TestAcceptSingleConn(t *testing.T) {
 	require := require.New(t)
 
-	ln := createListener(t, defaultUpgrader)
+	id, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 	defer ln.Close()
 
-	cconn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("1"))
+	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 
 	sconn, err := ln.Accept()
@@ -70,7 +64,8 @@ func TestAcceptSingleConn(t *testing.T) {
 func TestAcceptMultipleConns(t *testing.T) {
 	require := require.New(t)
 
-	ln := createListener(t, defaultUpgrader)
+	id, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 	defer ln.Close()
 
 	var toClose []io.Closer
@@ -81,7 +76,7 @@ func TestAcceptMultipleConns(t *testing.T) {
 	}()
 
 	for i := 0; i < 10; i++ {
-		cconn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("1"))
+		cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
 		require.NoError(err)
 		toClose = append(toClose, cconn)
 
@@ -100,10 +95,11 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	transport.AcceptTimeout = timeout
 	defer func() { transport.AcceptTimeout = 1 * time.Hour }()
 
-	ln := createListener(t, defaultUpgrader)
+	id, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 	defer ln.Close()
 
-	conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
+	conn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 
 	errCh := make(chan error)
@@ -133,11 +129,8 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 func TestFailedUpgradeOnListen(t *testing.T) {
 	require := require.New(t)
 
-	upgrader := &st.Upgrader{
-		Secure: &MuxAdapter{tpt: insecure.New(peer.ID("1"))},
-		Muxer:  &errorMuxer{},
-	}
-
+	id, upgrader := createUpgrader(t)
+	upgrader.Muxer = &errorMuxer{}
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -147,7 +140,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 		errCh <- err
 	}()
 
-	_, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
+	_, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.Error(err)
 
 	// close the listener.
@@ -158,7 +151,8 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 func TestListenerClose(t *testing.T) {
 	require := require.New(t)
 
-	ln := createListener(t, defaultUpgrader)
+	_, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 
 	errCh := make(chan error)
 	go func() {
@@ -181,18 +175,19 @@ func TestListenerClose(t *testing.T) {
 	require.Contains(err.Error(), "use of closed network connection")
 
 	// doesn't accept new connections when it is closed
-	_, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("1"))
+	_, err = dial(t, upgrader, ln.Multiaddr(), peer.ID("1"))
 	require.Error(err)
 }
 
 func TestListenerCloseClosesQueued(t *testing.T) {
 	require := require.New(t)
 
-	ln := createListener(t, defaultUpgrader)
+	id, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 
 	var conns []transport.CapableConn
 	for i := 0; i < 10; i++ {
-		conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID(fmt.Sprintf("%d", i)))
+		conn, err := dial(t, upgrader, ln.Multiaddr(), id)
 		require.NoError(err)
 		conns = append(conns, conn)
 	}
@@ -225,15 +220,11 @@ func TestListenerCloseClosesQueued(t *testing.T) {
 }
 
 func TestConcurrentAccept(t *testing.T) {
-	var (
-		require       = require.New(t)
-		num           = 3 * st.AcceptQueueLength
-		blockingMuxer = newBlockingMuxer()
-		upgrader      = &st.Upgrader{
-			Secure: &MuxAdapter{tpt: insecure.New(peer.ID("1"))},
-			Muxer:  blockingMuxer,
-		}
-	)
+	var num = 3 * st.AcceptQueueLength
+
+	id, upgrader := createUpgrader(t)
+	blockingMuxer := newBlockingMuxer()
+	upgrader.Muxer = blockingMuxer
 
 	ln := createListener(t, upgrader)
 	defer ln.Close()
@@ -258,7 +249,7 @@ func TestConcurrentAccept(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
+			conn, err := dial(t, upgrader, ln.Multiaddr(), id)
 			if err != nil {
 				errCh <- err
 				return
@@ -272,22 +263,23 @@ func TestConcurrentAccept(t *testing.T) {
 
 	time.Sleep(200 * time.Millisecond)
 	// the dials are still blocked, so we shouldn't have any connection available yet
-	require.Empty(accepted)
+	require.Empty(t, accepted)
 	blockingMuxer.Unblock() // make all dials succeed
-	require.Eventually(func() bool { return len(accepted) == num }, 3*time.Second, 100*time.Millisecond)
+	require.Eventually(t, func() bool { return len(accepted) == num }, 3*time.Second, 100*time.Millisecond)
 	wg.Wait()
 }
 
 func TestAcceptQueueBacklogged(t *testing.T) {
 	require := require.New(t)
 
-	ln := createListener(t, defaultUpgrader)
+	id, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 	defer ln.Close()
 
 	// setup AcceptQueueLength connections, but don't accept any of them
 	errCh := make(chan error, st.AcceptQueueLength+1)
 	doDial := func() {
-		conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("2"))
+		conn, err := dial(t, upgrader, ln.Multiaddr(), id)
 		errCh <- err
 		if conn != nil {
 			_ = conn.Close()
@@ -318,14 +310,14 @@ func TestListenerConnectionGater(t *testing.T) {
 	require := require.New(t)
 
 	testGater := &testGater{}
-	upgrader := *defaultUpgrader
+	id, upgrader := createUpgrader(t)
 	upgrader.ConnGater = testGater
 
-	ln := createListener(t, &upgrader)
+	ln := createListener(t, upgrader)
 	defer ln.Close()
 
 	// no gating.
-	conn, err := dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
+	conn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 	require.False(conn.IsClosed())
 	_ = conn.Close()
@@ -333,28 +325,28 @@ func TestListenerConnectionGater(t *testing.T) {
 	// rejecting after handshake.
 	testGater.BlockSecured(true)
 	testGater.BlockAccept(false)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
+	conn, err = dial(t, upgrader, ln.Multiaddr(), peer.ID("invalid"))
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting on accept will trigger first.
 	testGater.BlockSecured(true)
 	testGater.BlockAccept(true)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
+	conn, err = dial(t, upgrader, ln.Multiaddr(), peer.ID("invalid"))
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting only on acceptance.
 	testGater.BlockSecured(false)
 	testGater.BlockAccept(true)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
+	conn, err = dial(t, upgrader, ln.Multiaddr(), peer.ID("invalid"))
 	require.Error(err)
 	require.Nil(conn)
 
 	// back to normal
 	testGater.BlockSecured(false)
 	testGater.BlockAccept(false)
-	conn, err = dial(t, defaultUpgrader, ln.Multiaddr(), peer.ID("0"))
+	conn, err = dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 	require.False(conn.IsClosed())
 	_ = conn.Close()

@@ -6,26 +6,30 @@ import (
 	"net"
 	"testing"
 
+	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/mux"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/sec/insecure"
+	"github.com/libp2p/go-libp2p-core/test"
 	"github.com/libp2p/go-libp2p-core/transport"
-
 	mplex "github.com/libp2p/go-libp2p-mplex"
+	st "github.com/libp2p/go-libp2p-transport-upgrader"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-
-	st "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	"github.com/stretchr/testify/require"
 )
 
-var (
-	defaultUpgrader = &st.Upgrader{
-		Secure: &MuxAdapter{tpt: insecure.New(peer.ID("1"))},
+func createUpgrader(t *testing.T) (peer.ID, *st.Upgrader) {
+	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	id, err := peer.IDFromPrivateKey(priv)
+	require.NoError(t, err)
+	return id, &st.Upgrader{
+		Secure: &MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)},
 		Muxer:  &negotiatingMuxer{},
 	}
-)
+}
 
 // negotiatingMuxer sets up a new mplex connection
 // It makes sure that this happens at the same time for client and server.
@@ -106,28 +110,28 @@ func dial(t *testing.T, upgrader *st.Upgrader, raddr ma.Multiaddr, p peer.ID) (t
 func TestOutboundConnectionGating(t *testing.T) {
 	require := require.New(t)
 
-	ln := createListener(t, defaultUpgrader)
+	id, upgrader := createUpgrader(t)
+	ln := createListener(t, upgrader)
 	defer ln.Close()
 
 	testGater := &testGater{}
-	upgrader := *defaultUpgrader
-	upgrader.ConnGater = testGater
-
-	conn, err := dial(t, &upgrader, ln.Multiaddr(), peer.ID("2"))
+	_, dialUpgrader := createUpgrader(t)
+	dialUpgrader.ConnGater = testGater
+	conn, err := dial(t, dialUpgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 	require.NotNil(conn)
 	_ = conn.Close()
 
 	// blocking accepts doesn't affect the dialling side, only the listener.
 	testGater.BlockAccept(true)
-	conn, err = dial(t, &upgrader, ln.Multiaddr(), peer.ID("2"))
+	conn, err = dial(t, dialUpgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 	require.NotNil(conn)
 	_ = conn.Close()
 
 	// now let's block all connections after being secured.
 	testGater.BlockSecured(true)
-	conn, err = dial(t, &upgrader, ln.Multiaddr(), peer.ID("2"))
+	conn, err = dial(t, dialUpgrader, ln.Multiaddr(), id)
 	require.Error(err)
 	require.Contains(err.Error(), "gater rejected connection")
 	require.Nil(conn)

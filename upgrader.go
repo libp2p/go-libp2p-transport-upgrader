@@ -13,7 +13,7 @@ import (
 	ipnet "github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
-	"github.com/libp2p/go-libp2p-pnet"
+	pnet "github.com/libp2p/go-libp2p-pnet"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
@@ -62,6 +62,14 @@ func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, m
 // full libp2p-transport connection.
 func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
 	return u.upgrade(ctx, t, maconn, "", network.DirInbound)
+}
+
+// UpgradeInboundWithPeerCheck upgrades the given inbound multiaddr-net connection into a
+// full libp2p-transport connection.
+// It verifies that the remote peer ID matches p.
+// This is needed when upgrading a connection that resulted from a TCP simultaneous connect.
+func (u *Upgrader) UpgradeInboundWithPeerCheck(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
+	return u.upgrade(ctx, t, maconn, p, network.DirInbound)
 }
 
 func (u *Upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID, dir network.Direction) (transport.CapableConn, error) {

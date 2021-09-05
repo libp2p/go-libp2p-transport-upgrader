@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/transport"
+
 	logging "github.com/ipfs/go-log"
 	tec "github.com/jbenet/go-temp-err-catcher"
-	"github.com/libp2p/go-libp2p-core/transport"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
@@ -106,7 +108,7 @@ func (l *listener) handleIncoming() {
 			ctx, cancel := context.WithTimeout(l.ctx, transport.AcceptTimeout)
 			defer cancel()
 
-			conn, err := l.upgrader.UpgradeInbound(ctx, l.transport, maconn)
+			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "")
 			if err != nil {
 				// Don't bother bubbling this up. We just failed
 				// to completely negotiate the connection.

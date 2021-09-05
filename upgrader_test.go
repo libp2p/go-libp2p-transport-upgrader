@@ -8,12 +8,14 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/mux"
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/sec/insecure"
 	"github.com/libp2p/go-libp2p-core/test"
 	"github.com/libp2p/go-libp2p-core/transport"
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	st "github.com/libp2p/go-libp2p-transport-upgrader"
+
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 
@@ -104,7 +106,7 @@ func dial(t *testing.T, upgrader *st.Upgrader, raddr ma.Multiaddr, p peer.ID) (t
 	if err != nil {
 		return nil, err
 	}
-	return upgrader.UpgradeOutbound(context.Background(), nil, macon, p)
+	return upgrader.Upgrade(context.Background(), nil, macon, network.DirOutbound, p)
 }
 
 func TestOutboundConnectionGating(t *testing.T) {

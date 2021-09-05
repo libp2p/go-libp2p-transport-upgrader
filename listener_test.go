@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
 	st "github.com/libp2p/go-libp2p-transport-upgrader"
+
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 
@@ -26,8 +27,10 @@ type MuxAdapter struct {
 	tpt sec.SecureTransport
 }
 
-func (mux *MuxAdapter) SecureInbound(ctx context.Context, insecure net.Conn) (sec.SecureConn, bool, error) {
-	sconn, err := mux.tpt.SecureInbound(ctx, insecure)
+var _ sec.SecureMuxer = &MuxAdapter{}
+
+func (mux *MuxAdapter) SecureInbound(ctx context.Context, insecure net.Conn, p peer.ID) (sec.SecureConn, bool, error) {
+	sconn, err := mux.tpt.SecureInbound(ctx, insecure, p)
 	return sconn, true, err
 }
 

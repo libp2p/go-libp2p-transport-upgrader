@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -94,9 +95,13 @@ func TestAcceptMultipleConns(t *testing.T) {
 func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	require := require.New(t)
 
-	const timeout = 200 * time.Millisecond
+	var timeout = 100 * time.Millisecond
+	if os.Getenv("CI") != "" {
+		timeout = 500 * time.Millisecond
+	}
+	origAcceptTimeout := transport.AcceptTimeout
 	transport.AcceptTimeout = timeout
-	defer func() { transport.AcceptTimeout = 1 * time.Hour }()
+	t.Cleanup(func() { transport.AcceptTimeout = origAcceptTimeout })
 
 	id, upgrader := createUpgrader(t)
 	ln := createListener(t, upgrader)

@@ -26,11 +26,15 @@ var AcceptQueueLength = 16
 
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
+// The Upgrader can act in two distinct modes:
+// 1. Negotiating the security protocol using multistream: in this case, SecureMuxer must be set.
+// 2. Using the security protocol encoded in the multiaddr: in this case, SecureTransport must be set.
 type Upgrader struct {
-	PSK       ipnet.PSK
-	Secure    sec.SecureMuxer
-	Muxer     mux.Multiplexer
-	ConnGater connmgr.ConnectionGater
+	PSK             ipnet.PSK
+	SecureMuxer     sec.SecureMuxer     // only used for upgraders that handle addresses without the security protocol
+	SecureTransport sec.SecureTransport // only used for upgraders that handle addresses containing the security protocol
+	Muxer           mux.Multiplexer
+	ConnGater       connmgr.ConnectionGater
 }
 
 // UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
@@ -119,10 +123,21 @@ func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 }
 
 func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, bool, error) {
-	if dir == network.DirInbound {
-		return u.Secure.SecureInbound(ctx, conn, p)
+	if u.SecureMuxer != nil {
+		if dir == network.DirInbound {
+			return u.SecureMuxer.SecureInbound(ctx, conn, p)
+		}
+		return u.SecureMuxer.SecureOutbound(ctx, conn, p)
 	}
-	return u.Secure.SecureOutbound(ctx, conn, p)
+
+	// When we're not using the security handshake negotiation,
+	// we've already dealt with TCP simultaneous open during the TCP handshake.
+	if dir == network.DirInbound {
+		sconn, err := u.SecureTransport.SecureInbound(ctx, conn, p)
+		return sconn, true, err
+	}
+	sconn, err := u.SecureTransport.SecureOutbound(ctx, conn, p)
+	return sconn, false, err
 }
 
 func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (mux.MuxedConn, error) {

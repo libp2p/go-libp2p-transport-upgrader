@@ -52,7 +52,23 @@ func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
 func TestAcceptSingleConn(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
+	ln := createListener(t, upgrader)
+	defer ln.Close()
+
+	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
+	require.NoError(err)
+
+	sconn, err := ln.Accept()
+	require.NoError(err)
+
+	testConn(t, cconn, sconn)
+}
+
+func TestAcceptSingleConnWithSecureTransport(t *testing.T) {
+	require := require.New(t)
+
+	id, upgrader := createUpgraderWithSecureTransport(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -68,7 +84,7 @@ func TestAcceptSingleConn(t *testing.T) {
 func TestAcceptMultipleConns(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -103,7 +119,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	transport.AcceptTimeout = timeout
 	t.Cleanup(func() { transport.AcceptTimeout = origAcceptTimeout })
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -137,7 +153,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 func TestFailedUpgradeOnListen(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	upgrader.Muxer = &errorMuxer{}
 	ln := createListener(t, upgrader)
 	defer ln.Close()
@@ -159,7 +175,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 func TestListenerClose(t *testing.T) {
 	require := require.New(t)
 
-	_, upgrader := createUpgrader(t)
+	_, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 
 	errCh := make(chan error)
@@ -190,7 +206,7 @@ func TestListenerClose(t *testing.T) {
 func TestListenerCloseClosesQueued(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 
 	var conns []transport.CapableConn
@@ -230,7 +246,7 @@ func TestListenerCloseClosesQueued(t *testing.T) {
 func TestConcurrentAccept(t *testing.T) {
 	var num = 3 * st.AcceptQueueLength
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	blockingMuxer := newBlockingMuxer()
 	upgrader.Muxer = blockingMuxer
 
@@ -280,7 +296,7 @@ func TestConcurrentAccept(t *testing.T) {
 func TestAcceptQueueBacklogged(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -318,7 +334,7 @@ func TestListenerConnectionGater(t *testing.T) {
 	require := require.New(t)
 
 	testGater := &testGater{}
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	upgrader.ConnGater = testGater
 
 	ln := createListener(t, upgrader)

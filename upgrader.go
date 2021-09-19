@@ -13,7 +13,9 @@ import (
 	ipnet "github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
+
 	pnet "github.com/libp2p/go-libp2p-pnet"
+	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
@@ -51,6 +53,17 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 	}
 	go l.handleIncoming()
 	return l
+}
+
+// SecurityProtocol return the security protocol that this upgrader uses.
+// Note that this function only makes sense when not using a SecureMuxer.
+// If a SecureMuxer is used, the zero value of ma.Protocol is returned.
+func (u *Upgrader) SecurityProtocol() ma.Protocol {
+	if u.SecureMuxer != nil {
+		var zero ma.Protocol
+		return zero
+	}
+	return u.SecureTransport.Protocol()
 }
 
 // UpgradeOutbound upgrades the given outbound multiaddr-net connection into a

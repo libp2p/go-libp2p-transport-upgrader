@@ -72,6 +72,11 @@ func TestAcceptSingleConnWithSecureTransport(t *testing.T) {
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
+	protos := ln.Multiaddr().Protocols()
+	if protos[len(protos)-1].Code != upgrader.SecurityProtocol().Code {
+		t.Fatalf("expected listener multiaddr to contain the security protocol, but got %s", ln.Multiaddr())
+	}
+
 	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 

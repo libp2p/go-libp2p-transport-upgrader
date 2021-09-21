@@ -10,6 +10,7 @@ import (
 
 	logging "github.com/ipfs/go-log"
 	tec "github.com/jbenet/go-temp-err-catcher"
+	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
@@ -155,6 +156,14 @@ func (l *listener) Accept() (transport.CapableConn, error) {
 		}
 	}
 	return nil, l.err
+}
+
+func (l *listener) Multiaddr() ma.Multiaddr {
+	secProto := l.upgrader.SecurityProtocol()
+	if secProto.Code == 0 {
+		return l.Listener.Multiaddr()
+	}
+	return l.Listener.Multiaddr().Encapsulate(ma.StringCast("/" + secProto.Name))
 }
 
 func (l *listener) String() string {

@@ -125,14 +125,18 @@ func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 		return nil, fmt.Errorf("failed to negotiate stream multiplexer: %s", err)
 	}
 
-	tc := &transportConn{
+	var addrConn network.ConnMultiaddrs
+	addrConn = maconn
+	if u.SecureTransport != nil {
+		addrConn = newMultiaddrConn(maconn, u.SecurityProtocol())
+	}
+	return &transportConn{
 		MuxedConn:      smconn,
-		ConnMultiaddrs: maconn,
+		ConnMultiaddrs: addrConn,
 		ConnSecurity:   sconn,
 		transport:      t,
 		stat:           stat,
-	}
-	return tc, nil
+	}, nil
 }
 
 func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, bool, error) {

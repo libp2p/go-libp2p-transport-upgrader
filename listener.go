@@ -163,7 +163,7 @@ func (l *listener) Multiaddr() ma.Multiaddr {
 	if secProto.Code == 0 {
 		return l.Listener.Multiaddr()
 	}
-	return l.Listener.Multiaddr().Encapsulate(ma.StringCast("/" + secProto.Name))
+	return addSecurityProtocol(l.Listener.Multiaddr(), secProto)
 }
 
 func (l *listener) String() string {

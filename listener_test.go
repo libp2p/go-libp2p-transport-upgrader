@@ -49,6 +49,11 @@ func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
 	return upgrader.UpgradeListener(nil, ln)
 }
 
+func getLastProtocol(addr ma.Multiaddr) ma.Protocol {
+	protos := addr.Protocols()
+	return protos[len(protos)-1]
+}
+
 func TestAcceptSingleConn(t *testing.T) {
 	require := require.New(t)
 
@@ -58,9 +63,13 @@ func TestAcceptSingleConn(t *testing.T) {
 
 	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
+	require.Equal(getLastProtocol(cconn.LocalMultiaddr()).Code, ma.P_TCP)
+	require.Equal(getLastProtocol(cconn.RemoteMultiaddr()).Code, ma.P_TCP)
 
 	sconn, err := ln.Accept()
 	require.NoError(err)
+	require.Equal(getLastProtocol(sconn.LocalMultiaddr()).Code, ma.P_TCP)
+	require.Equal(getLastProtocol(sconn.RemoteMultiaddr()).Code, ma.P_TCP)
 
 	testConn(t, cconn, sconn)
 }
@@ -79,9 +88,13 @@ func TestAcceptSingleConnWithSecureTransport(t *testing.T) {
 
 	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
+	require.Equal(getLastProtocol(cconn.LocalMultiaddr()).Code, upgrader.SecurityProtocol().Code)
+	require.Equal(getLastProtocol(cconn.RemoteMultiaddr()).Code, upgrader.SecurityProtocol().Code)
 
 	sconn, err := ln.Accept()
 	require.NoError(err)
+	require.Equal(getLastProtocol(sconn.LocalMultiaddr()).Code, upgrader.SecurityProtocol().Code)
+	require.Equal(getLastProtocol(sconn.RemoteMultiaddr()).Code, upgrader.SecurityProtocol().Code)
 
 	testConn(t, cconn, sconn)
 }

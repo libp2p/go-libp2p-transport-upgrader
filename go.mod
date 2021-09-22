@@ -3,7 +3,7 @@ module github.com/libp2p/go-libp2p-transport-upgrader
 go 1.16
 
 require (
-	github.com/ipfs/go-log v1.0.4
+	github.com/ipfs/go-log/v2 v2.3.0
 	github.com/jbenet/go-temp-err-catcher v0.1.0
 	github.com/libp2p/go-libp2p-core v0.10.0
 	github.com/libp2p/go-libp2p-mplex v0.4.1

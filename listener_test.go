@@ -49,18 +49,52 @@ func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
 	return upgrader.UpgradeListener(nil, ln)
 }
 
+func getLastProtocol(addr ma.Multiaddr) ma.Protocol {
+	protos := addr.Protocols()
+	return protos[len(protos)-1]
+}
+
 func TestAcceptSingleConn(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
 	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
 	require.NoError(err)
+	require.Equal(getLastProtocol(cconn.LocalMultiaddr()).Code, ma.P_TCP)
+	require.Equal(getLastProtocol(cconn.RemoteMultiaddr()).Code, ma.P_TCP)
 
 	sconn, err := ln.Accept()
 	require.NoError(err)
+	require.Equal(getLastProtocol(sconn.LocalMultiaddr()).Code, ma.P_TCP)
+	require.Equal(getLastProtocol(sconn.RemoteMultiaddr()).Code, ma.P_TCP)
+
+	testConn(t, cconn, sconn)
+}
+
+func TestAcceptSingleConnWithSecureTransport(t *testing.T) {
+	require := require.New(t)
+
+	id, upgrader := createUpgraderWithSecureTransport(t)
+	ln := createListener(t, upgrader)
+	defer ln.Close()
+
+	protos := ln.Multiaddr().Protocols()
+	if protos[len(protos)-1].Code != upgrader.SecurityProtocol().Code {
+		t.Fatalf("expected listener multiaddr to contain the security protocol, but got %s", ln.Multiaddr())
+	}
+
+	cconn, err := dial(t, upgrader, ln.Multiaddr(), id)
+	require.NoError(err)
+	require.Equal(getLastProtocol(cconn.LocalMultiaddr()).Code, upgrader.SecurityProtocol().Code)
+	require.Equal(getLastProtocol(cconn.RemoteMultiaddr()).Code, upgrader.SecurityProtocol().Code)
+
+	sconn, err := ln.Accept()
+	require.NoError(err)
+	require.Equal(getLastProtocol(sconn.LocalMultiaddr()).Code, upgrader.SecurityProtocol().Code)
+	require.Equal(getLastProtocol(sconn.RemoteMultiaddr()).Code, upgrader.SecurityProtocol().Code)
 
 	testConn(t, cconn, sconn)
 }
@@ -68,7 +102,7 @@ func TestAcceptSingleConn(t *testing.T) {
 func TestAcceptMultipleConns(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -103,7 +137,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	transport.AcceptTimeout = timeout
 	t.Cleanup(func() { transport.AcceptTimeout = origAcceptTimeout })
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -137,7 +171,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 func TestFailedUpgradeOnListen(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	upgrader.Muxer = &errorMuxer{}
 	ln := createListener(t, upgrader)
 	defer ln.Close()
@@ -159,7 +193,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 func TestListenerClose(t *testing.T) {
 	require := require.New(t)
 
-	_, upgrader := createUpgrader(t)
+	_, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 
 	errCh := make(chan error)
@@ -190,7 +224,7 @@ func TestListenerClose(t *testing.T) {
 func TestListenerCloseClosesQueued(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 
 	var conns []transport.CapableConn
@@ -230,7 +264,7 @@ func TestListenerCloseClosesQueued(t *testing.T) {
 func TestConcurrentAccept(t *testing.T) {
 	var num = 3 * st.AcceptQueueLength
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	blockingMuxer := newBlockingMuxer()
 	upgrader.Muxer = blockingMuxer
 
@@ -280,7 +314,7 @@ func TestConcurrentAccept(t *testing.T) {
 func TestAcceptQueueBacklogged(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -318,7 +352,7 @@ func TestListenerConnectionGater(t *testing.T) {
 	require := require.New(t)
 
 	testGater := &testGater{}
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	upgrader.ConnGater = testGater
 
 	ln := createListener(t, upgrader)

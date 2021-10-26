@@ -22,14 +22,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createUpgrader(t *testing.T) (peer.ID, *st.Upgrader) {
+func createUpgraderWithSecureMuxer(t *testing.T) (peer.ID, *st.Upgrader) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	id, err := peer.IDFromPrivateKey(priv)
 	require.NoError(t, err)
 	return id, &st.Upgrader{
-		Secure: &MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)},
-		Muxer:  &negotiatingMuxer{},
+		SecureMuxer: &MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)},
+		Muxer:       &negotiatingMuxer{},
+	}
+}
+
+func createUpgraderWithSecureTransport(t *testing.T) (peer.ID, *st.Upgrader) {
+	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
+	require.NoError(t, err)
+	id, err := peer.IDFromPrivateKey(priv)
+	require.NoError(t, err)
+	return id, &st.Upgrader{
+		SecureTransport: insecure.NewWithIdentity(id, priv),
+		Muxer:           &negotiatingMuxer{},
 	}
 }
 
@@ -51,7 +62,7 @@ func (m *negotiatingMuxer) NewConn(c net.Conn, isServer bool) (mux.MuxedConn, er
 	return mplex.DefaultTransport.NewConn(c, isServer)
 }
 
-// blockingMuxer blocks the muxer negotiation until the contain chan is closed
+// blockingMuxer blocks the muxer negotiation until the contained chan is closed
 type blockingMuxer struct {
 	unblock chan struct{}
 }
@@ -112,12 +123,12 @@ func dial(t *testing.T, upgrader *st.Upgrader, raddr ma.Multiaddr, p peer.ID) (t
 func TestOutboundConnectionGating(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
+	id, upgrader := createUpgraderWithSecureMuxer(t)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
 	testGater := &testGater{}
-	_, dialUpgrader := createUpgrader(t)
+	_, dialUpgrader := createUpgraderWithSecureMuxer(t)
 	dialUpgrader.ConnGater = testGater
 	conn, err := dial(t, dialUpgrader, ln.Multiaddr(), id)
 	require.NoError(err)

@@ -68,7 +68,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 	if dir == network.DirOutbound && p == "" {
 		return nil, ErrNilPeer
 	}
-	var stat network.Stat
+	var stat network.ConnectionStat
 	if cs, ok := maconn.(network.ConnStat); ok {
 		stat = cs.Stat()
 	}

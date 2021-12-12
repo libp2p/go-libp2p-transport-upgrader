@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -285,33 +286,32 @@ func TestAcceptQueueBacklogged(t *testing.T) {
 	defer ln.Close()
 
 	// setup AcceptQueueLength connections, but don't accept any of them
-	errCh := make(chan error, st.AcceptQueueLength+1)
+	var counter int32 // to be used atomically
 	doDial := func() {
 		conn, err := dial(t, upgrader, ln.Multiaddr(), id)
-		errCh <- err
-		if conn != nil {
-			_ = conn.Close()
-		}
+		require.NoError(err)
+		atomic.AddInt32(&counter, 1)
+		t.Cleanup(func() { conn.Close() })
 	}
 
 	for i := 0; i < st.AcceptQueueLength; i++ {
 		go doDial()
 	}
 
-	require.Eventually(func() bool { return len(errCh) == st.AcceptQueueLength }, 2*time.Second, 100*time.Millisecond)
+	require.Eventually(func() bool { return int(atomic.LoadInt32(&counter)) == st.AcceptQueueLength }, 2*time.Second, 50*time.Millisecond)
 
 	// dial a new connection. This connection should not complete setup, since the queue is full
 	go doDial()
 
-	time.Sleep(500 * time.Millisecond)
-	require.Len(errCh, st.AcceptQueueLength)
+	time.Sleep(100 * time.Millisecond)
+	require.Equal(int(atomic.LoadInt32(&counter)), st.AcceptQueueLength)
 
 	// accept a single connection. Now the new connection should be set up, and fill the queue again
 	conn, err := ln.Accept()
 	require.NoError(err)
-	_ = conn.Close()
+	require.NoError(conn.Close())
 
-	require.Eventually(func() bool { return len(errCh) == st.AcceptQueueLength+1 }, 2*time.Second, 100*time.Millisecond)
+	require.Eventually(func() bool { return int(atomic.LoadInt32(&counter)) == st.AcceptQueueLength+1 }, 2*time.Second, 50*time.Millisecond)
 }
 
 func TestListenerConnectionGater(t *testing.T) {

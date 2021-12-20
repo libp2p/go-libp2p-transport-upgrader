@@ -80,6 +80,7 @@ func (l *listener) handleIncoming() {
 			l.err = err
 			return
 		}
+		catcher.Reset()
 
 		// gate the connection if applicable
 		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {

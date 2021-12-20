@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/mux"
@@ -13,6 +14,7 @@ import (
 	ipnet "github.com/libp2p/go-libp2p-core/pnet"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
+
 	pnet "github.com/libp2p/go-libp2p-pnet"
 	manet "github.com/multiformats/go-multiaddr/net"
 )
@@ -24,6 +26,8 @@ var ErrNilPeer = errors.New("nil peer")
 // AcceptQueueLength is the number of connections to fully setup before not accepting any new connections
 var AcceptQueueLength = 16
 
+const defaultAcceptTimeout = 15 * time.Second
+
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
 type Upgrader struct {
@@ -31,6 +35,13 @@ type Upgrader struct {
 	Secure    sec.SecureMuxer
 	Muxer     mux.Multiplexer
 	ConnGater connmgr.ConnectionGater
+
+	// AcceptTimeout is the maximum duration an Accept is allowed to take.
+	// This includes the time between accepting the raw network connection,
+	// protocol selection as well as the handshake, if applicable.
+	//
+	// If unset, the default value (15s) is used.
+	AcceptTimeout time.Duration
 }
 
 // UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
@@ -146,4 +157,11 @@ func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (
 		<-done
 		return nil, ctx.Err()
 	}
+}
+
+func (u *Upgrader) acceptTimeout() time.Duration {
+	if u.AcceptTimeout == 0 {
+		return defaultAcceptTimeout
+	}
+	return u.AcceptTimeout
 }

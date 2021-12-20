@@ -105,7 +105,7 @@ func (l *listener) handleIncoming() {
 		go func() {
 			defer wg.Done()
 
-			ctx, cancel := context.WithTimeout(l.ctx, transport.AcceptTimeout)
+			ctx, cancel := context.WithTimeout(l.ctx, l.upgrader.acceptTimeout())
 			defer cancel()
 
 			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "")

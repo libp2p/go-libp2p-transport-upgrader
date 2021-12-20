@@ -21,10 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func init() {
-	transport.AcceptTimeout = 1 * time.Hour
-}
-
 type MuxAdapter struct {
 	tpt sec.SecureTransport
 }
@@ -100,11 +96,9 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	if os.Getenv("CI") != "" {
 		timeout = 500 * time.Millisecond
 	}
-	origAcceptTimeout := transport.AcceptTimeout
-	transport.AcceptTimeout = timeout
-	t.Cleanup(func() { transport.AcceptTimeout = origAcceptTimeout })
 
 	id, upgrader := createUpgrader(t)
+	upgrader.AcceptTimeout = timeout
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 

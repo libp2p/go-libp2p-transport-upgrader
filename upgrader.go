@@ -70,7 +70,7 @@ type upgrader struct {
 
 var _ transport.Upgrader = &upgrader{}
 
-func NewUpgrader(secureMuxer sec.SecureMuxer, muxer mux.Multiplexer, opts ...Option) (transport.Upgrader, error) {
+func New(secureMuxer sec.SecureMuxer, muxer mux.Multiplexer, opts ...Option) (transport.Upgrader, error) {
 	u := &upgrader{
 		secure:        secureMuxer,
 		muxer:         muxer,

@@ -32,7 +32,7 @@ func createUpgraderWithMuxer(t *testing.T, muxer mux.Multiplexer, opts ...st.Opt
 	require.NoError(t, err)
 	id, err := peer.IDFromPrivateKey(priv)
 	require.NoError(t, err)
-	u, err := st.NewUpgrader(&MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)}, muxer, opts...)
+	u, err := st.New(&MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)}, muxer, opts...)
 	require.NoError(t, err)
 	return id, u
 }

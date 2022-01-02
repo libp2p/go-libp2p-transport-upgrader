@@ -99,14 +99,6 @@ func (u *upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 	return l
 }
 
-func (u *upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
-	return u.Upgrade(ctx, t, maconn, network.DirOutbound, p)
-}
-
-func (u *upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
-	return u.Upgrade(ctx, t, maconn, network.DirInbound, "")
-}
-
 func (u *upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, dir network.Direction, p peer.ID) (transport.CapableConn, error) {
 	if dir == network.DirOutbound && p == "" {
 		return nil, ErrNilPeer

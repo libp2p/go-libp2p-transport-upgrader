@@ -13,6 +13,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/sec/insecure"
 	"github.com/libp2p/go-libp2p-core/test"
 	"github.com/libp2p/go-libp2p-core/transport"
+
 	mplex "github.com/libp2p/go-libp2p-mplex"
 	st "github.com/libp2p/go-libp2p-transport-upgrader"
 
@@ -22,15 +23,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createUpgrader(t *testing.T) (peer.ID, *st.Upgrader) {
+func createUpgrader(t *testing.T, opts ...st.Option) (peer.ID, transport.Upgrader) {
+	return createUpgraderWithMuxer(t, &negotiatingMuxer{}, opts...)
+}
+
+func createUpgraderWithMuxer(t *testing.T, muxer mux.Multiplexer, opts ...st.Option) (peer.ID, transport.Upgrader) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	id, err := peer.IDFromPrivateKey(priv)
 	require.NoError(t, err)
-	return id, &st.Upgrader{
-		Secure: &MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)},
-		Muxer:  &negotiatingMuxer{},
-	}
+	u, err := st.NewUpgrader(&MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)}, muxer, opts...)
+	require.NoError(t, err)
+	return id, u
 }
 
 // negotiatingMuxer sets up a new mplex connection
@@ -99,7 +103,7 @@ func testConn(t *testing.T, clientConn, serverConn transport.CapableConn) {
 	require.Equal([]byte("foobar"), b)
 }
 
-func dial(t *testing.T, upgrader *st.Upgrader, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
+func dial(t *testing.T, upgrader transport.Upgrader, raddr ma.Multiaddr, p peer.ID) (transport.CapableConn, error) {
 	t.Helper()
 
 	macon, err := manet.Dial(raddr)
@@ -117,8 +121,7 @@ func TestOutboundConnectionGating(t *testing.T) {
 	defer ln.Close()
 
 	testGater := &testGater{}
-	_, dialUpgrader := createUpgrader(t)
-	dialUpgrader.ConnGater = testGater
+	_, dialUpgrader := createUpgrader(t, st.WithConnectionGater(testGater))
 	conn, err := dial(t, dialUpgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 	require.NotNil(conn)

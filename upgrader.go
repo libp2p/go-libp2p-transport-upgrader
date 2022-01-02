@@ -28,24 +28,63 @@ var AcceptQueueLength = 16
 
 const defaultAcceptTimeout = 15 * time.Second
 
+type Option func(*upgrader) error
+
+func WithPSK(psk ipnet.PSK) Option {
+	return func(u *upgrader) error {
+		u.psk = psk
+		return nil
+	}
+}
+
+func WithAcceptTimeout(t time.Duration) Option {
+	return func(u *upgrader) error {
+		u.acceptTimeout = t
+		return nil
+	}
+}
+
+func WithConnectionGater(g connmgr.ConnectionGater) Option {
+	return func(u *upgrader) error {
+		u.connGater = g
+		return nil
+	}
+}
+
 // Upgrader is a multistream upgrader that can upgrade an underlying connection
 // to a full transport connection (secure and multiplexed).
-type Upgrader struct {
-	PSK       ipnet.PSK
-	Secure    sec.SecureMuxer
-	Muxer     mux.Multiplexer
-	ConnGater connmgr.ConnectionGater
+type upgrader struct {
+	secure sec.SecureMuxer
+	muxer  mux.Multiplexer
+
+	psk       ipnet.PSK
+	connGater connmgr.ConnectionGater
 
 	// AcceptTimeout is the maximum duration an Accept is allowed to take.
 	// This includes the time between accepting the raw network connection,
 	// protocol selection as well as the handshake, if applicable.
 	//
 	// If unset, the default value (15s) is used.
-	AcceptTimeout time.Duration
+	acceptTimeout time.Duration
 }
 
-// UpgradeListener upgrades the passed multiaddr-net listener into a full libp2p-transport listener.
-func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) transport.Listener {
+var _ transport.Upgrader = &upgrader{}
+
+func NewUpgrader(secureMuxer sec.SecureMuxer, muxer mux.Multiplexer, opts ...Option) (transport.Upgrader, error) {
+	u := &upgrader{
+		secure:        secureMuxer,
+		muxer:         muxer,
+		acceptTimeout: defaultAcceptTimeout,
+	}
+	for _, opt := range opts {
+		if err := opt(u); err != nil {
+			return nil, err
+		}
+	}
+	return u, nil
+}
+
+func (u *upgrader) UpgradeListener(t transport.Transport, list manet.Listener) transport.Listener {
 	ctx, cancel := context.WithCancel(context.Background())
 	l := &listener{
 		Listener:  list,
@@ -60,22 +99,15 @@ func (u *Upgrader) UpgradeListener(t transport.Transport, list manet.Listener) t
 	return l
 }
 
-// UpgradeOutbound upgrades the given outbound multiaddr-net connection into a
-// full libp2p-transport connection.
-// Deprecated: use Upgrade instead.
-func (u *Upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
+func (u *upgrader) UpgradeOutbound(ctx context.Context, t transport.Transport, maconn manet.Conn, p peer.ID) (transport.CapableConn, error) {
 	return u.Upgrade(ctx, t, maconn, network.DirOutbound, p)
 }
 
-// UpgradeInbound upgrades the given inbound multiaddr-net connection into a
-// full libp2p-transport connection.
-// Deprecated: use Upgrade instead.
-func (u *Upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
+func (u *upgrader) UpgradeInbound(ctx context.Context, t transport.Transport, maconn manet.Conn) (transport.CapableConn, error) {
 	return u.Upgrade(ctx, t, maconn, network.DirInbound, "")
 }
 
-// Upgrade upgrades the multiaddr/net connection into a full libp2p-transport connection.
-func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, dir network.Direction, p peer.ID) (transport.CapableConn, error) {
+func (u *upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, dir network.Direction, p peer.ID) (transport.CapableConn, error) {
 	if dir == network.DirOutbound && p == "" {
 		return nil, ErrNilPeer
 	}
@@ -85,8 +117,8 @@ func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}
 
 	var conn net.Conn = maconn
-	if u.PSK != nil {
-		pconn, err := pnet.NewProtectedConn(u.PSK, conn)
+	if u.psk != nil {
+		pconn, err := pnet.NewProtectedConn(u.psk, conn)
 		if err != nil {
 			conn.Close()
 			return nil, fmt.Errorf("failed to setup private network protector: %s", err)
@@ -104,7 +136,7 @@ func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}
 
 	// call the connection gater, if one is registered.
-	if u.ConnGater != nil && !u.ConnGater.InterceptSecured(dir, sconn.RemotePeer(), maconn) {
+	if u.connGater != nil && !u.connGater.InterceptSecured(dir, sconn.RemotePeer(), maconn) {
 		if err := maconn.Close(); err != nil {
 			log.Errorf("failed to close connection with peer %s and addr %s; err: %s",
 				p.Pretty(), maconn.RemoteMultiaddr(), err)
@@ -129,14 +161,14 @@ func (u *Upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 	return tc, nil
 }
 
-func (u *Upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, bool, error) {
+func (u *upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, bool, error) {
 	if dir == network.DirInbound {
-		return u.Secure.SecureInbound(ctx, conn, p)
+		return u.secure.SecureInbound(ctx, conn, p)
 	}
-	return u.Secure.SecureOutbound(ctx, conn, p)
+	return u.secure.SecureOutbound(ctx, conn, p)
 }
 
-func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (mux.MuxedConn, error) {
+func (u *upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (mux.MuxedConn, error) {
 	// TODO: The muxer should take a context.
 	done := make(chan struct{})
 
@@ -144,7 +176,7 @@ func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (
 	var err error
 	go func() {
 		defer close(done)
-		smconn, err = u.Muxer.NewConn(conn, server)
+		smconn, err = u.muxer.NewConn(conn, server)
 	}()
 
 	select {
@@ -157,11 +189,4 @@ func (u *Upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool) (
 		<-done
 		return nil, ctx.Err()
 	}
-}
-
-func (u *Upgrader) acceptTimeout() time.Duration {
-	if u.AcceptTimeout == 0 {
-		return defaultAcceptTimeout
-	}
-	return u.AcceptTimeout
 }

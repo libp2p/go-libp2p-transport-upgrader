@@ -19,7 +19,7 @@ type listener struct {
 	manet.Listener
 
 	transport transport.Transport
-	upgrader  *Upgrader
+	upgrader  *upgrader
 
 	incoming chan transport.CapableConn
 	err      error
@@ -83,7 +83,7 @@ func (l *listener) handleIncoming() {
 		catcher.Reset()
 
 		// gate the connection if applicable
-		if l.upgrader.ConnGater != nil && !l.upgrader.ConnGater.InterceptAccept(maconn) {
+		if l.upgrader.connGater != nil && !l.upgrader.connGater.InterceptAccept(maconn) {
 			log.Debugf("gater blocked incoming connection on local addr %s from %s",
 				maconn.LocalMultiaddr(), maconn.RemoteMultiaddr())
 
@@ -106,7 +106,7 @@ func (l *listener) handleIncoming() {
 		go func() {
 			defer wg.Done()
 
-			ctx, cancel := context.WithTimeout(l.ctx, l.upgrader.acceptTimeout())
+			ctx, cancel := context.WithTimeout(l.ctx, l.upgrader.acceptTimeout)
 			defer cancel()
 
 			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "")

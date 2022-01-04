@@ -37,7 +37,7 @@ func (mux *MuxAdapter) SecureOutbound(ctx context.Context, insecure net.Conn, p 
 	return sconn, false, err
 }
 
-func createListener(t *testing.T, upgrader *st.Upgrader) transport.Listener {
+func createListener(t *testing.T, upgrader transport.Upgrader) transport.Listener {
 	t.Helper()
 	addr, err := ma.NewMultiaddr("/ip4/127.0.0.1/tcp/0")
 	require.NoError(t, err)
@@ -97,8 +97,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 		timeout = 500 * time.Millisecond
 	}
 
-	id, upgrader := createUpgrader(t)
-	upgrader.AcceptTimeout = timeout
+	id, upgrader := createUpgrader(t, st.WithAcceptTimeout(timeout))
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -132,10 +131,8 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 func TestFailedUpgradeOnListen(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
-	upgrader.Muxer = &errorMuxer{}
+	id, upgrader := createUpgraderWithMuxer(t, &errorMuxer{})
 	ln := createListener(t, upgrader)
-	defer ln.Close()
 
 	errCh := make(chan error)
 	go func() {
@@ -171,9 +168,8 @@ func TestListenerClose(t *testing.T) {
 	}
 
 	// unblocks Accept when it is closed.
-	err := ln.Close()
-	require.NoError(err)
-	err = <-errCh
+	require.NoError(ln.Close())
+	err := <-errCh
 	require.Error(err)
 	require.Contains(err.Error(), "use of closed network connection")
 
@@ -225,10 +221,8 @@ func TestListenerCloseClosesQueued(t *testing.T) {
 func TestConcurrentAccept(t *testing.T) {
 	var num = 3 * st.AcceptQueueLength
 
-	id, upgrader := createUpgrader(t)
 	blockingMuxer := newBlockingMuxer()
-	upgrader.Muxer = blockingMuxer
-
+	id, upgrader := createUpgraderWithMuxer(t, blockingMuxer)
 	ln := createListener(t, upgrader)
 	defer ln.Close()
 
@@ -312,8 +306,7 @@ func TestListenerConnectionGater(t *testing.T) {
 	require := require.New(t)
 
 	testGater := &testGater{}
-	id, upgrader := createUpgrader(t)
-	upgrader.ConnGater = testGater
+	id, upgrader := createUpgrader(t, st.WithConnectionGater(testGater))
 
 	ln := createListener(t, upgrader)
 	defer ln.Close()

@@ -1,4 +1,4 @@
-package stream
+package upgrader
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 )
 
-var log = logging.Logger("stream-upgrader")
+var log = logging.Logger("upgrader")
 
 type listener struct {
 	manet.Listener

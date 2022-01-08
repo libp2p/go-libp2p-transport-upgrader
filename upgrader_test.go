@@ -1,10 +1,12 @@
-package stream_test
+package upgrader_test
 
 import (
 	"context"
 	"errors"
 	"net"
 	"testing"
+
+	upgrader "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/mux"
@@ -15,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/transport"
 
 	mplex "github.com/libp2p/go-libp2p-mplex"
-	st "github.com/libp2p/go-libp2p-transport-upgrader"
 
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -23,16 +24,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func createUpgrader(t *testing.T, opts ...st.Option) (peer.ID, transport.Upgrader) {
+func createUpgrader(t *testing.T, opts ...upgrader.Option) (peer.ID, transport.Upgrader) {
 	return createUpgraderWithMuxer(t, &negotiatingMuxer{}, opts...)
 }
 
-func createUpgraderWithMuxer(t *testing.T, muxer mux.Multiplexer, opts ...st.Option) (peer.ID, transport.Upgrader) {
+func createUpgraderWithMuxer(t *testing.T, muxer mux.Multiplexer, opts ...upgrader.Option) (peer.ID, transport.Upgrader) {
 	priv, _, err := test.RandTestKeyPair(crypto.Ed25519, 256)
 	require.NoError(t, err)
 	id, err := peer.IDFromPrivateKey(priv)
 	require.NoError(t, err)
-	u, err := st.New(&MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)}, muxer, opts...)
+	u, err := upgrader.New(&MuxAdapter{tpt: insecure.NewWithIdentity(id, priv)}, muxer, opts...)
 	require.NoError(t, err)
 	return id, u
 }
@@ -116,12 +117,12 @@ func dial(t *testing.T, upgrader transport.Upgrader, raddr ma.Multiaddr, p peer.
 func TestOutboundConnectionGating(t *testing.T) {
 	require := require.New(t)
 
-	id, upgrader := createUpgrader(t)
-	ln := createListener(t, upgrader)
+	id, u := createUpgrader(t)
+	ln := createListener(t, u)
 	defer ln.Close()
 
 	testGater := &testGater{}
-	_, dialUpgrader := createUpgrader(t, st.WithConnectionGater(testGater))
+	_, dialUpgrader := createUpgrader(t, upgrader.WithConnectionGater(testGater))
 	conn, err := dial(t, dialUpgrader, ln.Multiaddr(), id)
 	require.NoError(err)
 	require.NotNil(conn)

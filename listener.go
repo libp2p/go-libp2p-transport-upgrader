@@ -20,6 +20,7 @@ type listener struct {
 
 	transport transport.Transport
 	upgrader  *upgrader
+	rcmgr     network.ResourceManager
 
 	incoming chan transport.CapableConn
 	err      error
@@ -86,9 +87,17 @@ func (l *listener) handleIncoming() {
 		if l.upgrader.connGater != nil && !l.upgrader.connGater.InterceptAccept(maconn) {
 			log.Debugf("gater blocked incoming connection on local addr %s from %s",
 				maconn.LocalMultiaddr(), maconn.RemoteMultiaddr())
-
 			if err := maconn.Close(); err != nil {
-				log.Warnf("failed to incoming connection rejected by gater; err: %s", err)
+				log.Warnf("failed to close incoming connection rejected by gater: %s", err)
+			}
+			continue
+		}
+
+		connScope, err := l.rcmgr.OpenConnection(network.DirInbound, true)
+		if err != nil {
+			log.Debugw("resource manager blocked accept of new connection", "error", err)
+			if err := maconn.Close(); err != nil {
+				log.Warnf("failed to incoming connection rejected by resource manager: %s", err)
 			}
 			continue
 		}
@@ -109,7 +118,7 @@ func (l *listener) handleIncoming() {
 			ctx, cancel := context.WithTimeout(l.ctx, l.upgrader.acceptTimeout)
 			defer cancel()
 
-			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "")
+			conn, err := l.upgrader.Upgrade(ctx, l.transport, maconn, network.DirInbound, "", connScope)
 			if err != nil {
 				// Don't bother bubbling this up. We just failed
 				// to completely negotiate the connection.
@@ -117,6 +126,7 @@ func (l *listener) handleIncoming() {
 					err,
 					maconn.LocalMultiaddr(),
 					maconn.RemoteMultiaddr())
+				connScope.Done()
 				return
 			}
 

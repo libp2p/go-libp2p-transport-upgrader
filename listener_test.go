@@ -2,6 +2,7 @@ package upgrader_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -12,13 +13,16 @@ import (
 
 	upgrader "github.com/libp2p/go-libp2p-transport-upgrader"
 
+	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/sec"
 	"github.com/libp2p/go-libp2p-core/transport"
 
+	mocknetwork "github.com/libp2p/go-libp2p-testing/mocks/network"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,7 +58,7 @@ func TestAcceptSingleConn(t *testing.T) {
 	ln := createListener(t, u)
 	defer ln.Close()
 
-	cconn, err := dial(t, u, ln.Multiaddr(), id)
+	cconn, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 	require.NoError(err)
 
 	sconn, err := ln.Accept()
@@ -78,7 +82,7 @@ func TestAcceptMultipleConns(t *testing.T) {
 	}()
 
 	for i := 0; i < 10; i++ {
-		cconn, err := dial(t, u, ln.Multiaddr(), id)
+		cconn, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 		require.NoError(err)
 		toClose = append(toClose, cconn)
 
@@ -102,7 +106,7 @@ func TestConnectionsClosedIfNotAccepted(t *testing.T) {
 	ln := createListener(t, u)
 	defer ln.Close()
 
-	conn, err := dial(t, u, ln.Multiaddr(), id)
+	conn, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 	require.NoError(err)
 
 	errCh := make(chan error)
@@ -141,7 +145,7 @@ func TestFailedUpgradeOnListen(t *testing.T) {
 		errCh <- err
 	}()
 
-	_, err := dial(t, u, ln.Multiaddr(), id)
+	_, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 	require.Error(err)
 
 	// close the listener.
@@ -175,7 +179,7 @@ func TestListenerClose(t *testing.T) {
 	require.Contains(err.Error(), "use of closed network connection")
 
 	// doesn't accept new connections when it is closed
-	_, err = dial(t, u, ln.Multiaddr(), peer.ID("1"))
+	_, err = dial(t, u, ln.Multiaddr(), peer.ID("1"), network.NullScope)
 	require.Error(err)
 }
 
@@ -187,7 +191,7 @@ func TestListenerCloseClosesQueued(t *testing.T) {
 
 	var conns []transport.CapableConn
 	for i := 0; i < 10; i++ {
-		conn, err := dial(t, upgrader, ln.Multiaddr(), id)
+		conn, err := dial(t, upgrader, ln.Multiaddr(), id, network.NullScope)
 		require.NoError(err)
 		conns = append(conns, conn)
 	}
@@ -247,7 +251,7 @@ func TestConcurrentAccept(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			conn, err := dial(t, u, ln.Multiaddr(), id)
+			conn, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 			if err != nil {
 				errCh <- err
 				return
@@ -277,7 +281,7 @@ func TestAcceptQueueBacklogged(t *testing.T) {
 	// setup AcceptQueueLength connections, but don't accept any of them
 	var counter int32 // to be used atomically
 	doDial := func() {
-		conn, err := dial(t, u, ln.Multiaddr(), id)
+		conn, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 		require.NoError(err)
 		atomic.AddInt32(&counter, 1)
 		t.Cleanup(func() { conn.Close() })
@@ -313,7 +317,7 @@ func TestListenerConnectionGater(t *testing.T) {
 	defer ln.Close()
 
 	// no gating.
-	conn, err := dial(t, u, ln.Multiaddr(), id)
+	conn, err := dial(t, u, ln.Multiaddr(), id, network.NullScope)
 	require.NoError(err)
 	require.False(conn.IsClosed())
 	_ = conn.Close()
@@ -321,29 +325,80 @@ func TestListenerConnectionGater(t *testing.T) {
 	// rejecting after handshake.
 	testGater.BlockSecured(true)
 	testGater.BlockAccept(false)
-	conn, err = dial(t, u, ln.Multiaddr(), peer.ID("invalid"))
+	conn, err = dial(t, u, ln.Multiaddr(), "invalid", network.NullScope)
 	require.Error(err)
 	require.Nil(conn)
 
-	// rejecting on accept will trigger first.
+	// rejecting on accept will trigger firupgrader.
 	testGater.BlockSecured(true)
 	testGater.BlockAccept(true)
-	conn, err = dial(t, u, ln.Multiaddr(), peer.ID("invalid"))
+	conn, err = dial(t, u, ln.Multiaddr(), "invalid", network.NullScope)
 	require.Error(err)
 	require.Nil(conn)
 
 	// rejecting only on acceptance.
 	testGater.BlockSecured(false)
 	testGater.BlockAccept(true)
-	conn, err = dial(t, u, ln.Multiaddr(), peer.ID("invalid"))
+	conn, err = dial(t, u, ln.Multiaddr(), "invalid", network.NullScope)
 	require.Error(err)
 	require.Nil(conn)
 
 	// back to normal
 	testGater.BlockSecured(false)
 	testGater.BlockAccept(false)
-	conn, err = dial(t, u, ln.Multiaddr(), id)
+	conn, err = dial(t, u, ln.Multiaddr(), id, network.NullScope)
 	require.NoError(err)
 	require.False(conn.IsClosed())
 	_ = conn.Close()
+}
+
+func TestListenerResourceManagement(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	rcmgr := mocknetwork.NewMockResourceManager(ctrl)
+	id, upgrader := createUpgrader(t, upgrader.WithResourceManager(rcmgr))
+	ln := createListener(t, upgrader)
+	defer ln.Close()
+
+	connScope := mocknetwork.NewMockConnManagementScope(ctrl)
+	gomock.InOrder(
+		rcmgr.EXPECT().OpenConnection(network.DirInbound, true).Return(connScope, nil),
+		connScope.EXPECT().SetPeer(id),
+		connScope.EXPECT().PeerScope(),
+	)
+
+	cconn, err := dial(t, upgrader, ln.Multiaddr(), id, network.NullScope)
+	require.NoError(t, err)
+	defer cconn.Close()
+
+	sconn, err := ln.Accept()
+	require.NoError(t, err)
+	connScope.EXPECT().Done()
+	defer sconn.Close()
+}
+
+func TestListenerResourceManagementDenied(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	rcmgr := mocknetwork.NewMockResourceManager(ctrl)
+	id, upgrader := createUpgrader(t, upgrader.WithResourceManager(rcmgr))
+	ln := createListener(t, upgrader)
+
+	rcmgr.EXPECT().OpenConnection(network.DirInbound, true).Return(nil, errors.New("nope"))
+	_, err := dial(t, upgrader, ln.Multiaddr(), id, network.NullScope)
+	require.Error(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ln.Accept()
+	}()
+
+	select {
+	case <-done:
+		t.Fatal("accept shouldn't have accepted anything")
+	case <-time.After(50 * time.Millisecond):
+	}
+	require.NoError(t, ln.Close())
+	<-done
 }

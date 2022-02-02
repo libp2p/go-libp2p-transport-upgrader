@@ -363,6 +363,7 @@ func TestListenerResourceManagement(t *testing.T) {
 	connScope := mocknetwork.NewMockConnManagementScope(ctrl)
 	gomock.InOrder(
 		rcmgr.EXPECT().OpenConnection(network.DirInbound, true).Return(connScope, nil),
+		connScope.EXPECT().PeerScope(),
 		connScope.EXPECT().SetPeer(id),
 		connScope.EXPECT().PeerScope(),
 	)

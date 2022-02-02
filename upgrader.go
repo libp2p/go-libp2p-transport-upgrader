@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/connmgr"
@@ -159,7 +160,7 @@ func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	}
 	// Only call SetPeer if it hasn't already been set -- this can happen when we don't know
 	// the peer in advance and in some bug scenarios.
-	if connScope.PeerScope() == nil {
+	if ps := connScope.PeerScope(); ps == nil || reflect.ValueOf(ps).IsNil() {
 		if err := connScope.SetPeer(sconn.RemotePeer()); err != nil {
 			log.Debugw("resource manager blocked connection for peer", "peer", sconn.RemotePeer(), "addr", conn.RemoteAddr(), "error", err)
 			if err := maconn.Close(); err != nil {

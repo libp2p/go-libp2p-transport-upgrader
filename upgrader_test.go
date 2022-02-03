@@ -153,7 +153,11 @@ func TestOutboundResourceManagement(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 		connScope := mocknetwork.NewMockConnManagementScope(ctrl)
-		connScope.EXPECT().PeerScope().Return(network.NullScope)
+		gomock.InOrder(
+			connScope.EXPECT().PeerScope(),
+			connScope.EXPECT().SetPeer(id),
+			connScope.EXPECT().PeerScope().Return(network.NullScope),
+		)
 		_, dialUpgrader := createUpgrader(t)
 		conn, err := dial(t, dialUpgrader, ln.Multiaddr(), id, connScope)
 		require.NoError(t, err)
@@ -171,6 +175,8 @@ func TestOutboundResourceManagement(t *testing.T) {
 		defer ctrl.Finish()
 		connScope := mocknetwork.NewMockConnManagementScope(ctrl)
 		gomock.InOrder(
+			connScope.EXPECT().PeerScope(),
+			connScope.EXPECT().SetPeer(id),
 			connScope.EXPECT().PeerScope().Return(network.NullScope),
 			connScope.EXPECT().Done(),
 		)

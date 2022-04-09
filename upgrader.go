@@ -194,25 +194,32 @@ func (u *upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, 
 	return u.secure.SecureOutbound(ctx, conn, p)
 }
 
-func (u *upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool, scope network.PeerScope) (network.MuxedConn, error) {
+func (u *upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool, scope network.PeerScope) (smconn network.MuxedConn, err error) {
 	// TODO: The muxer should take a context.
-	done := make(chan struct{})
+	//
+	// The logic below was borrowed from the standard library, copyright the Go Authors
+	// (crypto/tls/conn.go).
+	if ctx.Done() != nil {
+		doneCh := make(chan struct{})
+		interruptCh := make(chan error, 1)
+		defer func() {
+			close(doneCh)
+			if ctxErr := <-interruptCh; ctxErr != nil {
+				err = ctxErr
+			}
+		}()
 
-	var smconn network.MuxedConn
-	var err error
-	go func() {
-		defer close(done)
-		smconn, err = u.muxer.NewConn(conn, server, scope)
-	}()
-
-	select {
-	case <-done:
-		return smconn, err
-	case <-ctx.Done():
-		// interrupt this process
-		conn.Close()
-		// wait to finish
-		<-done
-		return nil, ctx.Err()
+		go func() {
+			select {
+			case <-doneCh:
+				interruptCh <- nil
+			case <-ctx.Done():
+				// interrupt this process
+				_ = conn.Close()
+				interruptCh <- ctx.Err()
+			}
+		}()
 	}
+
+	return u.muxer.NewConn(conn, server, scope)
 }

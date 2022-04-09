@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/connmgr"
@@ -121,10 +123,28 @@ func (u *upgrader) Upgrade(ctx context.Context, t transport.Transport, maconn ma
 	return c, nil
 }
 
-func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, dir network.Direction, p peer.ID, connScope network.ConnManagementScope) (transport.CapableConn, error) {
+func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn manet.Conn, dir network.Direction, p peer.ID, connScope network.ConnManagementScope) (tconn transport.CapableConn, err error) {
 	if dir == network.DirOutbound && p == "" {
 		return nil, ErrNilPeer
 	}
+
+	defer func() {
+		// We catch panics here because connection negotiation is complex and error prone.
+		// Any panics mean we have a bug, but we might as well not take down the entire
+		// program.
+		//
+		// We _also_ catch panics inside the security/muxer upgrade functions, but we have a
+		// final "catch" here just in case closing the connection or some auxiliary function
+		// panics.
+		//
+		// Consider this recover the "last ditch" effort to not die.
+		if rerr := recover(); rerr != nil {
+			tconn = nil
+			fmt.Fprintf(os.Stderr, "panic when upgrading connection: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic when upgrading connection: %s", rerr)
+		}
+	}()
+
 	var stat network.ConnStats
 	if cs, ok := maconn.(network.ConnStat); ok {
 		stat = cs.Stat()
@@ -187,7 +207,15 @@ func (u *upgrader) upgrade(ctx context.Context, t transport.Transport, maconn ma
 	return tc, nil
 }
 
-func (u *upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sec.SecureConn, bool, error) {
+func (u *upgrader) setupSecurity(ctx context.Context, conn net.Conn, p peer.ID, dir network.Direction) (sconn sec.SecureConn, isServer bool, err error) {
+	defer func() {
+		// Catch panics in the security negotiation. Catching this _here_ allows the caller
+		// to close the underlying connection (if desired).
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "panic when securing connection: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic when securing connection to %s: %s", conn.RemoteAddr(), rerr)
+		}
+	}()
 	if dir == network.DirInbound {
 		return u.secure.SecureInbound(ctx, conn, p)
 	}
@@ -220,6 +248,15 @@ func (u *upgrader) setupMuxer(ctx context.Context, conn net.Conn, server bool, s
 			}
 		}()
 	}
+
+	defer func() {
+		// Catch panics in the security negotiation. Catching this _here_ allows the caller
+		// to close the underlying connection (if desired).
+		if rerr := recover(); rerr != nil {
+			fmt.Fprintf(os.Stderr, "panic when multiplexing connection: %s\n%s\n", rerr, debug.Stack())
+			err = fmt.Errorf("panic when multiplexing connection to %s: %s", conn.RemoteAddr(), rerr)
+		}
+	}()
 
 	return u.muxer.NewConn(conn, server, scope)
 }
